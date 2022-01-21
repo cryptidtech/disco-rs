@@ -37,6 +37,7 @@ std = [
   "k256/default",
   "p256/default",
   "rand/std",
+  "rand/std_rng",
   "x25519-dalek/default",
 ]
 no-std = [
