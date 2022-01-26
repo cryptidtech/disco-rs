@@ -8,51 +8,36 @@ repository = "https://github.com/cryptidtech/disco-rs"
 readme = "README.md"
 license = "Apache-2.0"
 edition = "2021"
-keywords = ["no_std", "cryptography", "noise"]
+keywords = ["cryptography", "no-std", "noise", "strobe", "disco"]
+categories = ["cryptography", "no-std"]
+rust-version = "1.58.1"
 
 [features]
 alloc = [
-  "cde/alloc",
-  "elliptic-curve/alloc",
-  "k256",
-  "p256",
-  "rand/alloc",
-  "x25519-dalek",
+    "cde/alloc",
+    "rand/alloc",
 ]
 default = [
-  "std"
+    "std"
 ]
 preselect = [
-  "cde/default",
-  "elliptic-curve/default",
-  "k256/default",
-  "p256/default",
-  "rand/getrandom",
-  "rand_xorshift",
-  "x25519-dalek/default",
+    "cde/default",
+    "rand/getrandom",
+    "rand_xorshift",
 ]
 std = [
-  "cde/std",
-  "elliptic-curve/default",
-  "k256/default",
-  "p256/default",
-  "rand/std",
-  "rand/std_rng",
-  "x25519-dalek/default",
+    "cde/std",
+    "rand/std",
+    "rand/std_rng",
 ]
 no-std = [
-  "cde/no-std",
-  "k256",
-  "p256",
-  "x25519-dalek"
+    "cde/no-std",
+    "rand_xorshift",
 ]
 
-
 [dependencies]
-cde = { version = "0.3", default-features = false }
-elliptic-curve = { version = "0.10", features = ["ecdh"], optional = true }
-k256 = { version = "0.9", features = ["ecdh"], default-features = false, optional = true }
-p256 = { version = "0.9", features = ["ecdh"], default-features = false, optional = true }
+anyhow = { version = "1.0", default-features = false }
+cde = { version = "0.3.1", default-features = false }
 rand_core = "0.6"
 rand_core5 = { version = "0.5", package = "rand_core" }
 rand = { version = "0.8", default-features = false, optional = true }
@@ -61,10 +46,4 @@ rand_chacha = "0.3"
 semver = { version = "1.0", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["serde_derive"] }
 strobe-rs = { version = "0.7", default-features = false, features = ["serde"] }
-x25519-dalek = { version = "1.1", default-features = false, optional = true }
-
-[dev-dependencies]
-rand = "0.8"
-rand7 = { version = "0.7", package = "rand" }
-rand_xorshift = "0.3"
-serde_bare = "0.5"
+thiserror = { version = "1.0", default-features = false }

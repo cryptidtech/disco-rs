@@ -16,14 +16,19 @@ extern crate alloc;
 #[macro_use]
 extern crate std;
 
+/// Disco key traits
+pub mod key;
 /// Disco params
-//pub mod params;
+pub mod params;
 /// Disco session
-//pub mod session;
+pub mod session;
 /// Disco session builder
-//pub mod builder;
+pub mod builder;
 /// Disco errors
-//pub mod error;
+pub mod error;
+
+/// the Result type for all operations
+pub type Result<T> = anyhow::Result<T, error::Error>;
 
 #[cfg(not(any(feature = "alloc", feature = "std")))]
 mod inner {
