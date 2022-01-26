@@ -1,6 +1,6 @@
 [package]
 name = "disco-ecdh-example"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Dave Huseby <dave@cryptid.tech>"]
 description = "A no-std, pure Rust impl of Disco Noise Protocol extension"
 documentation = "https://docs.rs/disco-rs"
@@ -14,120 +14,63 @@ rust-version = "1.58.1"
 
 [features]
 alloc = [
-    "aes-gcm/alloc",
-    "aes-gcm-siv/alloc",
-    "blake2",
-    "bls12_381_plus/alloc",
     "cde/alloc",
-    "chacha20poly1305/alloc",
-    "core2/alloc",
     "curve25519-dalek/alloc",
     "disco-rs/alloc",
     "ed25519-dalek/alloc",
     "elliptic-curve/alloc",
-    "hkdf",
     "k256",
     "p256",
     "rand/alloc",
-    "rayon",
-    "sha2",
-    "sha3",
-    "unknown_order/openssl",
     "x25519-dalek"
 ]
 default = [
     "std"
 ]
 preselect = [
-    "aes-gcm/default",
-    "aes-gcm-siv/default",
-    "blake2/default",
-    "bls12_381_plus/default",
     "cde/default",
-    "chacha20poly1305/default",
-    "core2/default",
     "curve25519-dalek/default",
     "disco-rs/preselect",
     "ed25519-dalek/default",
     "elliptic-curve/default",
     "heapless",
-    "hkdf/std",
     "k256/default",
     "p256/default",
     "rand/getrandom",
     "rand_xorshift",
-    "sha2/default",
-    "sha3/default",
-    "unknown_order/openssl",
     "x25519-dalek/default",
 ]
 std = [
-    "aes-gcm/default",
-    "aes-gcm-siv/default",
-    "blake2/std",
-    "bls12_381_plus/default",
     "cde/std",
-    "chacha20poly1305/std",
-    "core2/std",
     "curve25519-dalek/default",
     "disco-rs/std",
     "ed25519-dalek/default",
     "elliptic-curve/default",
-    "hkdf/std",
     "k256/default",
     "p256/default",
     "rand/std",
-    "rayon",
-    "sha2/std",
-    "sha3/std",
-    "unknown_order/openssl",
     "x25519-dalek/default",
 ]
 no-std = [
-    "aes-gcm/heapless",
-    "aes-gcm-siv/heapless",
-    "blake2",
-    "bls12_381_plus/digest",
-    "bls12_381_plus/pairing",
-    "bls12_381_plus/pairings",
     "cde/no-std",
-    "chacha20poly1305/heapless",
-    "core2",
     "curve25519-dalek",
     "disco-rs/no-std",
     "elliptic-curve",
     "heapless",
-    "hkdf",
     "k256",
     "p256",
     "rand_xorshift",
-    "sha2",
-    "sha3",
     "x25519-dalek",
 ]
 
 [dependencies]
-aead = "0.4"
-aes-gcm = { version = "0.9", default-features = false, optional = true }
-aes-gcm-siv = { version = "0.10", default-features = false, optional = true }
-blake2 = { version = "0.9", default-features = false, optional = true }
-bls12_381_plus = { version = "0.5.2", default-features = false, optional = true }
 cde = { version = "0.3.1", default-features = false }
-chacha20poly1305 = { version = "0.9", default-features = false, optional = true }
-core2 = { version = "0.3", default-features = false, optional = true }
 crypto-bigint = "0.2"
 curve25519-dalek = { version = "4.0.0-pre.1", default-features = false, optional = true }
-digest = "0.9"
 disco-rs = { version = "0.1", path = "../", default-features = false }
 ed25519-dalek = { version = "1.0", default-features = false, optional = true }
 elliptic-curve = { version = "0.10", features = ["ecdh"], optional = true }
-ff = "0.10"
-generic-array = "0.14"
 heapless = { version = "0.7", optional = true }
-hex = "0.4"
-hkdf = { version = "0.11", optional = true }
-group = "0.10"
-merlin = "3.0"
 k256 = { version = "0.9", features = ["ecdh", "ecdsa"], default-features = false, optional = true }
 p256 = { version = "0.9", features = ["ecdh", "ecdsa"], default-features = false, optional = true }
 rand_core = "0.6"
@@ -135,18 +78,9 @@ rand_core5 = { version = "0.5", package = "rand_core" }
 rand = { version = "0.8", default-features = false, optional = true }
 rand_xorshift = { version = "0.3", optional = true }
 rand_chacha = "0.3"
-rayon = { version = "1.5", optional = true }
 semver = { version = "1.0", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["serde_derive"] }
-signature_bls = "*"
-signature_trait = { version = "1.3", package = "signature" }
-sha2 = { version = "0.9", default-features = false,  optional = true }
-sha3 = { version = "0.9", default-features = false, optional = true }
-siphasher = "0.3"
 strobe-rs = { version = "0.7", default-features = false, features = ["serde"] }
-subtle = "2.4"
-unknown_order = { version = "0.3", default-features = false, optional = true }
-vsss-rs = "1.4"
 x25519-dalek = { version = "1.1", default-features = false, optional = true }
 zeroize = "1.4"
 
