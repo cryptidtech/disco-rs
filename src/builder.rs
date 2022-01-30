@@ -26,6 +26,8 @@ where
     local_ephemeral_public_key: P,
     /// Remote ephemeral public key
     remote_static_public_key: P,
+    /// Pre-shared key
+    pre_shared_key: S,
     /// Out of order delivery 
     out_of_order: bool,
 }
@@ -46,6 +48,7 @@ where
             local_ephemeral_secret_key: S::default(),
             local_ephemeral_public_key: P::default(),
             remote_static_public_key: P::default(),
+            pre_shared_key: S::default(),
             out_of_order: false,
         }
     }
@@ -80,6 +83,12 @@ where
         self
     }
 
+    /// Add a pre-shared key
+    pub fn pre_shared_key(mut self, key: &S) -> Self {
+        self.pre_shared_key = key.clone();
+        self
+    }
+
     /// Create strobe states that can handle out-of-order messages
     pub fn out_of_order(mut self, ooo: bool) -> Self {
         self.out_of_order = ooo;
@@ -106,6 +115,10 @@ where
             return Err(Error::Builder(BuilderError::MissingRemotePublicKey));
         }
 
+        if self.pre_shared_key.is_zero() && self.params.handshake.needs_pre_shared_key(initiator) {
+            return Err(Error::Builder(BuilderError::MissingPreSharedKey));
+        }
+
         Ok(Session::Initialized {
             strobe: Strobe::new(format!("{}", self.params).as_bytes(), SecParam::B256),
             params: self.params,
@@ -116,6 +129,7 @@ where
             ep: self.local_ephemeral_public_key,
             es: self.local_ephemeral_secret_key,
             rs: self.remote_static_public_key,
+            psk: self.pre_shared_key,
         })
     }
 }

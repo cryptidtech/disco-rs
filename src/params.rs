@@ -98,6 +98,8 @@ pub enum HandshakeData {
     Re,
     /// Payload data
     P,
+    /// Pre-shared key
+    Psk,
 }
 
 /// Different operations to perform in handshake scripts
@@ -157,12 +159,30 @@ impl Iterator for HandshakeState {
 /// The handshake patterns we support for now
 #[derive(PartialEq, Copy, Clone, Debug)]
 pub enum Handshake {
+    /// One-way, no static key for initiator
+    N,
+    /// One-way, static key for initiator known to responder
+    K,
+    /// One-way, static key for initiator is transmitted to responder
+    X,
+    /// No static keys for either the initiator or responder
+    NN,
+    /// Both sides know each other's static public keys
+    KK,
     /// Both sides transmit their keys
     XX,
+    /// Initiator transmits their static public key immediately
+    IK,
+    /// No static key for the initiator, reponder key known
+    NK,
+    /// No static key for the initiator, responder transmits key
+    NX,
     /// Initiator transmits key and knows responders key, deferred
     XK1,
     /// Initiator and responder know each other's keys, deferred
     KK1,
+    /// Initiator and responder know a pre-shared key
+    NNpsk2,
 }
 
 impl Handshake {
@@ -173,6 +193,343 @@ impl Handshake {
         use HandshakeData::*;
 
         match self {
+            // N_Strobe Session Setup
+            // ========================
+            //
+            // Initiator                            Responder
+            //
+            //                      <- s
+            //                      ...
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_N...")        | InitSymmetric("Noise_N...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s = load_key()                     | s = load_key()
+            // | re = NULL                          | re = NULL
+            // | rs = Bob's Static Pub Key          | rs = Alice's Static Pub Key
+            //
+            // +-- send_message()
+            // | MixHash(s.pub)
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | MixKey(DH(e.sec, rs))
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            // | Split()
+            //
+            //                      -> e, es, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | MixHash(rs)
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | MixKey(DH(s.sec, re))
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            Handshake::N => {
+                if initiator {
+                    &[/* send */
+                        Mix(Rs, false),
+                        SendData(Epub),
+                        MixDh(Esec, Rs, true),
+                        SendData(P),
+                        Split,
+                    ]
+                } else {
+                    &[/* recv */
+                        Mix(Spub, false),
+                        RecvData(Re),
+                        MixDh(Ssec, Re, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                }
+            },
+            // K_Strobe Session Setup
+            // ========================
+            //
+            // Initiator                            Responder
+            //
+            //                      -> s
+            //                      <- s
+            //                      ...
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_K...")        | InitSymmetric("Noise_K...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s = load_key()                     | s = load_key()
+            // | re = NULL                          | re = NULL
+            // | rs = Bob's Static Pub Key          | rs = Alice's Static Pub Key
+            //
+            // +-- send_message()
+            // | MixHash(s.pub)
+            // | MixHash(rs)
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | MixKey(DH(e.sec, rs))
+            // | MixKeyAndHash(DH(s.sec, rs))
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            // | Split()
+            //
+            //                      -> e, es, ss, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | MixHash(rs)
+            //                                      | MixHash(s.pub)
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | MixKey(DH(s.sec, re))
+            //                                      | MixKeyAndHash(DH(s.sec, rs))
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            Handshake::K => {
+                if initiator {
+                    &[/* send */
+                        Mix(Spub, false),
+                        Mix(Rs, false),
+                        SendData(Epub),
+                        MixDh(Esec, Rs, true),
+                        MixDh(Ssec, Rs, true),
+                        SendData(P),
+                        Split,
+                    ]
+                } else {
+                    &[/* recv */
+                        Mix(Rs, false),
+                        Mix(Spub, false),
+                        RecvData(Re),
+                        MixDh(Ssec, Re, true),
+                        MixDh(Ssec, Rs, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                }
+            },
+            // X_Strobe Session Setup
+            // ========================
+            //
+            // Initiator                            Responder
+            //
+            //                      <- s
+            //                      ...
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_X...")        | InitSymmetric("Noise_X...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s = load_key()                     | s = load_key()
+            // | re = NULL                          | re, rs = NULL
+            // | rs = Bob's Static Pub Key          |
+            //
+            // +-- send_message()
+            // | MixHash(rs)
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | MixKey(DH(e.sec, rs))
+            // | SendAndHash(s.pub)
+            // | MixHash(s.pub)
+            // | MixKeyAndHash(DH(s.sec, rs))
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            // | Split()
+            //
+            //                      -> e, es, s, ss, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | MixHash(s.pub)
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | MixKey(DH(s.sec, re))
+            //                                      | rs = RecvAndHash()
+            //                                      | MixHash(rs)
+            //                                      | MixKeyAndHash(DH(s.sec, rs))
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            Handshake::X => {
+                if initiator {
+                    &[/* send */
+                        Mix(Rs, false),
+                        SendData(Epub),
+                        MixDh(Esec, Rs, true),
+                        SendData(Spub),
+                        MixDh(Ssec, Rs, true),
+                        SendData(P),
+                        Split,
+                    ]
+                } else {
+                    &[/* recv */
+                        Mix(Spub, false),
+                        RecvData(Re),
+                        MixDh(Ssec, Re, true),
+                        RecvData(Rs),
+                        MixDh(Ssec, Rs, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                }
+            },
+            // NN_Strobe Session Setup
+            // =======================
+            //
+            // Initiator                            Responder
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_NN...")       | InitSymmetric("Noise_NN...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s, re, res = NULL                  | s, re, rs = NULL
+            //
+            // +-- send_message()
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            // 
+            //                      -> e, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //
+            //                                      +-- send_message()
+            //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
+            //                                      | MixKey(DH(e.sec, re))
+            //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            //
+            //                      <- e, ee, (payload)
+            //
+            // +-- recv_message()
+            // | re = RecvAndHash()
+            // | MixHash(re)
+            // | MixKey(DH(e.sec, re))
+            // | payload = RecvAndHash()
+            // | MixHash(payload)
+            // | Split()
+            //
+            Handshake::NN => {
+                if initiator {
+                    &[/* send */
+                        SendData(Epub),
+                        SendData(P),
+                        Stop,
+                      /* recv */
+                        RecvData(Re),
+                        MixDh(Esec, Re, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                } else {
+                    &[/* recv */
+                        RecvData(Re),
+                        RecvData(P),
+                        Stop,
+                      /* send */
+                        SendData(Epub),
+                        MixDh(Esec, Re, true),
+                        SendData(P),
+                        Split,
+                    ]
+                }
+            },
+            // KK_Strobe Session Setup
+            // ========================
+            //
+            // Initiator                            Responder
+            //
+            //                      -> s
+            //                      <- s
+            //                      ...
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_KK...")       | InitSymmetric("Noise_KK...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s = load_key()                     | s = load_key()
+            // | re = NULL                          | re = NULL
+            // | rs = Bob's Static Pub Key          | rs = Alice's Static Pub Key
+            //
+            // +-- send_message()
+            // | MixHash(s.pub)
+            // | MixHash(rs)
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | MixKey(DH(e.sec, rs))
+            // | MixKeyAndHash(DH(s.sec, rs))
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            //
+            //                      -> e, es, ss, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | MixHash(rs)
+            //                                      | MixHash(s.pub)
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | MixKeyAndHash(DH(s.sec, re))
+            //                                      | MixKeyAndHash(DH(s.sec, rs))
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //
+            //                                      +-- send_message()
+            //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
+            //                                      | MixKeyAndHash(DH(e.sec, re))
+            //                                      | MixKeyAndHash(DH(s.sec, re))
+            //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            //
+            //                      <- e, ee, se, (payload)
+            //
+            // +-- recv_message()
+            // | re = RecvAndHash()
+            // | MixHash(re)
+            // | MixKeyAndHash(DH(e.sec, re))
+            // | MixKeyAndHash(DH(e.sec, rs))
+            // | payload = RecvAndHash()
+            // | MixHash(payload)
+            // | Split()
+            Handshake::KK => {
+                if initiator {
+                    &[/* send */
+                        Mix(Spub, false),
+                        Mix(Rs, false),
+                        SendData(Epub),
+                        MixDh(Esec, Rs, true),
+                        MixDh(Ssec, Rs, true),
+                        SendData(P),
+                        Stop,
+                      /* recv */
+                        RecvData(Re),
+                        MixDh(Esec, Re, true),
+                        MixDh(Esec, Rs, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                } else {
+                    &[/* recv */
+                        Mix(Rs, false),
+                        Mix(Spub, false),
+                        RecvData(Re),
+                        MixDh(Ssec, Re, true),
+                        MixDh(Ssec, Rs, true),
+                        RecvData(P),
+                        Stop,
+                      /* send */
+                        SendData(Epub),
+                        MixDh(Esec, Re, true),
+                        MixDh(Ssec, Re, true),
+                        SendData(P),
+                        Split,
+                    ]
+                }
+            },
             // XX_Strobe Session Setup
             // =======================
             //
@@ -185,55 +542,57 @@ impl Handshake {
             // | re, rs = NULL                      | re, rs = NULL
             //
             // +-- send_message()
-            // | MixHash(e.pub)
             // | SendAndHash(e.pub)
-            // | MixHash(payload)
+            // | MixHash(e.pub)
             // | SendAndHash(payload)
+            // | MixHash(payload)
             // 
             //                      -> e, (payload)
             //
             //                                      +-- recv_message()
-            //                                      | MixHash(re)
             //                                      | re = RecvAndHash()
-            //                                      | MixHash(payload)
+            //                                      | MixHash(re)
             //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
             //
             //                                      +-- send_message()
-            //                                      | MixHash(e.pub)
             //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
             //                                      | MixKey(DH(e.sec, re))
-            //                                      | MixHash(s.pub)
             //                                      | SendAndHash(s.pub)
+            //                                      | MixHash(s.pub)
             //                                      | MixKeyAndHash(DH(s.sec, re))
-            //                                      | MixHash(payload)
             //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
             //
             //                      <- e, ee, s, es, (payload)
             //
             // +-- recv_message()
-            // | MixHash(re)
             // | re = RecvAndHash()
+            // | MixHash(re)
             // | MixKey(DH(e.sec, re))
-            // | MixHash(rs)
             // | rs = RecvAndHash()
+            // | MixHash(rs)
             // | MixKeyAndHash(DH(e.sec, rs))
-            // | MixHash(payload)
             // | payload = RecvAndHash()
+            // | MixHash(payload)
             // 
             // +-- send_message()
-            // | MixHash(s.pub)
             // | SendAndHash(s.pub)
+            // | MixHash(s.pub)
             // | MixKeyAndHash(DH(s.sec, re))
             // | SendAndHash(payload)
+            // | MixHash(payload)
             // | Split()
             //
             //                      -> s, se, (payload)
             //
             //                                      +-- recv_message()
-            //                                      | MixHash(rs)
             //                                      | rs = RecvAndHash()
+            //                                      | MixHash(rs)
             //                                      | MixKeyAndHash(DH(s.sec, rs))
             //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
             //                                      | Split()
             Handshake::XX => {
                 if initiator {
@@ -274,7 +633,257 @@ impl Handshake {
                     ]
                 }
             },
-
+            // IK_Strobe Session Setup
+            // =======================
+            //
+            // Initiator                            Responder
+            //
+            //                      <- s
+            //                      ...
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_IK...")       | InitSymmetric("Noise_IK...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s = load_key()                     | s = load_key()
+            // | re = NULL                          | re, rs = NULL
+            // | rs = Bob's Static Pub Key
+            //
+            // +-- send_message()
+            // | MixHash(rs)
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | MixKey(DH(e.sec, rs))
+            // | SendAndHash(s.pub)
+            // | MixKeyAndHash(DH(s.sec, rs))
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            // 
+            //                      -> e, es, s, ss, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | MixHash(s.pub)
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | MixKey(DH(s.sec, re))
+            //                                      | rs = RecvAndHash()
+            //                                      | MixHash(rs)
+            //                                      | MixKeyAndHash(DH(s.sec, rs))
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //
+            //                                      +-- send_message()
+            //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
+            //                                      | MixKeyAndHash(DH(e.sec, re))
+            //                                      | MixKeyAndHash(DH(e.sec, rs))
+            //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            //
+            //                      <- e, ee, se, (payload)
+            //
+            // +-- recv_message()
+            // | re = RecvAndHash()
+            // | MixHash(re)
+            // | MixKeyAndHash(DH(e.sec, re))
+            // | MixKeyAndHash(DH(s.sec, re))
+            // | payload = RecvAndHash()
+            // | MixHash(payload)
+            // | Split()
+            //
+            Handshake::IK => {
+                if initiator {
+                    &[/* send */
+                        Mix(Rs, false),
+                        SendData(Epub),
+                        MixDh(Esec, Rs, true),
+                        SendData(Spub),
+                        MixDh(Ssec, Rs, true),
+                        SendData(P),
+                        Stop,
+                      /* recv */
+                        RecvData(Re),
+                        MixDh(Esec, Re, true),
+                        MixDh(Esec, Rs, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                } else {
+                    &[/* recv */
+                        Mix(Spub, false),
+                        RecvData(Re),
+                        MixDh(Ssec, Re, true),
+                        RecvData(Rs),
+                        MixDh(Ssec, Rs, true),
+                        RecvData(P),
+                        Stop,
+                      /* send */
+                        SendData(Epub),
+                        MixDh(Esec, Re, true),
+                        MixDh(Ssec, Re, true),
+                        SendData(P),
+                        Split,
+                    ]
+                }
+            },
+            // NK_Strobe Session Setup
+            // =======================
+            //
+            // Initiator                            Responder
+            //
+            //                      <- s
+            //                      ...
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_NK...")       | InitSymmetric("Noise_NK...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s = load_key()                     | s = load_key()
+            // | re = NULL                          | re, rs = NULL
+            // | rs = Bob's Static Pub Key
+            //
+            // +-- send_message()
+            // | MixHash(rs)
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | MixKey(DH(e.sec, rs))
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            // 
+            //                      -> e, es, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | MixHash(s.pub)
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | MixKey(DH(s.sec, re))
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //
+            //                                      +-- send_message()
+            //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
+            //                                      | MixKeyAndHash(DH(e.sec, re))
+            //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            //
+            //                      <- e, ee, (payload)
+            //
+            // +-- recv_message()
+            // | re = RecvAndHash()
+            // | MixHash(re)
+            // | MixKeyAndHash(DH(e.sec, re))
+            // | payload = RecvAndHash()
+            // | MixHash(payload)
+            // | Split()
+            //
+            Handshake::NK => {
+                if initiator {
+                    &[/* send */
+                        Mix(Rs, false),
+                        SendData(Epub),
+                        MixDh(Esec, Rs, true),
+                        SendData(P),
+                        Stop,
+                      /* recv */
+                        RecvData(Re),
+                        MixDh(Esec, Re, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                } else {
+                    &[/* recv */
+                        Mix(Spub, false),
+                        RecvData(Re),
+                        MixDh(Ssec, Re, true),
+                        RecvData(P),
+                        Stop,
+                      /* send */
+                        SendData(Epub),
+                        MixDh(Esec, Re, true),
+                        SendData(P),
+                        Split,
+                    ]
+                }
+            },
+            // NX_Strobe Session Setup
+            // =======================
+            //
+            // Initiator                            Responder
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_NX...")       | InitSymmetric("Noise_NX...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s = load_key()                     | s = load_key()
+            // | re, rs = NULL                      | re, rs = NULL
+            //
+            // +-- send_message()
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            // 
+            //                      -> e, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //
+            //                                      +-- send_message()
+            //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
+            //                                      | MixKeyAndHash(DH(e.sec, re))
+            //                                      | SendAndHash(s.pub)
+            //                                      | MixHash(s.pub)
+            //                                      | MixKeyAndHash(DH(s.sec, re))
+            //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            //
+            //                      <- e, ee, s, es, (payload)
+            //
+            // +-- recv_message()
+            // | re = RecvAndHash()
+            // | MixHash(re)
+            // | MixKeyAndHash(DH(e.sec, re))
+            // | rs = RecvAndHash()
+            // | MixHash(rs)
+            // | MixKeyAndHash(DH(e.sec, rs))
+            // | payload = RecvAndHash()
+            // | MixHash(payload)
+            // | Split()
+            //
+            Handshake::NX => {
+                if initiator {
+                    &[/* send */
+                        SendData(Epub),
+                        SendData(P),
+                        Stop,
+                      /* recv */
+                        RecvData(Re),
+                        MixDh(Esec, Re, true),
+                        RecvData(Rs),
+                        MixDh(Esec, Rs, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                } else {
+                    &[/* recv */
+                        RecvData(Re),
+                        RecvData(P),
+                        Stop,
+                      /* send */
+                        SendData(Epub),
+                        MixDh(Esec, Re, true),
+                        SendData(Spub),
+                        MixDh(Ssec, Re, true),
+                        SendData(P),
+                        Split,
+                    ]
+                }
+            },
             // XK1_Strobe Session Setup
             // ========================
             //
@@ -292,72 +901,70 @@ impl Handshake {
             //
             // +-- send_message()
             // | MixHash(rs)
-            // | MixHash(e.pub)
             // | SendAndHash(e.pub)
-            // | MixHash(payload)
+            // | MixHash(e.pub)
             // | SendAndHash(payload)
+            // | MixHash(payload)
             //
             //                      -> e, (payload)
             //
             //                                      +-- recv_message()
             //                                      | MixHash(s.pub)
-            //                                      | MixHash(re)
             //                                      | re = RecvAndHash()
-            //                                      | MixHash(payload)
+            //                                      | MixHash(re)
             //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
             //
             //                                      +-- send_message()
-            //                                      | MixHash(e.pub)
             //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
             //                                      | MixKey(DH(e.sec, re))
             //                                      | MixKeyAndHash(DH(s.sec, re))
-            //                                      | MixHash(payload)
             //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
             //
             //                      <- e, ee, es, (payload)
             //
             // +-- recv_message()
-            // | MixHash(re)
             // | re = RecvAndHash()
+            // | MixHash(re)
             // | MixKey(AD(e.sec, re))
             // | MixKeyAndHash(AD(e.sec, rs))
-            // | MixHash(payload)
             // | payload = RecvAndHash()
+            // | MixHash(payload)
             //
             // +-- send_message()
-            // | MixHash(s.pub)
             // | SendAndHash(s.pub)
-            // | MixKeyAndHash(DH(s.sec, re))
+            // | MixHash(s.pub)
+            // | MixKeyAndHash(AD(s.sec, re))
             // | SendAndHash(payload)
+            // | MixHash(payload)
             // | Split()
             //
             //                      -> s, se, (payload)
             //
             //                                      +-- recv_message()
-            //                                      | MixHash(rs)
             //                                      | rs = RecvAndHash()
+            //                                      | MixHash(rs)
             //                                      | MixKeyAndHash(DH(e.sec, rs))
-            //                                      | SendAndHash(payload)
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
             //                                      | Split()
+            //
             Handshake::XK1 => {
                 if initiator {
                     &[/* send */
                         Mix(Rs, false),
-                        Mix(Epub, false),
                         SendData(Epub),
-                        Mix(P, false),
                         SendData(P),
                         Stop,
                       /* recv */
-                        Mix(Re, false),
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         MixDh(Esec, Rs, true),
-                        Mix(P, true),
                         RecvData(P),
                         Stop,
                       /* send */
-                        Mix(Spub, true),
                         SendData(Spub),
                         MixDh(Ssec, Re, true),
                         SendData(P),
@@ -366,21 +973,16 @@ impl Handshake {
                 } else {
                     &[/* recv */
                         Mix(Spub, false),
-                        Mix(Re, false),
                         RecvData(Re),
-                        Mix(P, false),
                         RecvData(P),
                         Stop,
                       /* send */
-                        Mix(Epub, false),
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         MixDh(Ssec, Re, true),
-                        Mix(P, true),
                         SendData(P),
                         Stop,
                       /* recv */
-                        Mix(Rs, true),
                         RecvData(Rs),
                         MixDh(Esec, Rs, true),
                         RecvData(P),
@@ -407,63 +1009,56 @@ impl Handshake {
             // +-- send_message()
             // | MixHash(s.pub)
             // | MixHash(rs)
-            // | MixHash(e.pub)
             // | SendAndHash(e.pub)
-            // | MixHash(payload)
+            // | MixHash(e.pub)
             // | SendAndHash(payload)
+            // | MixHash(payload)
             //
             //                      -> e, (payload)
             //
             //                                      +-- recv_message()
             //                                      | MixHash(rs)
             //                                      | MixHash(s.pub)
-            //                                      | MixHash(re)
             //                                      | re = RecvAndHash()
-            //                                      | MixHash(payload)
+            //                                      | MixHash(re)
             //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
             //
             //                                      +-- send_message()
-            //                                      | MixHash(e.pub)
             //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
             //                                      | MixKey(DH(e.sec, re))
             //                                      | MixKeyAndHash(DH(s.sec, re))
             //                                      | MixKeyAndHash(DH(e.sec, rs))
-            //                                      | MixKeyAndHash(DH(s.sec, rs))
-            //                                      | MixHash(payload)
             //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
             //                                      | Split()
             //
-            //                      <- e, ee, es, se, ss, (payload)
+            //                      <- e, ee, se, es, (payload)
             //
             // +-- recv_message()
-            // | MixHash(re)
             // | re = RecvAndHash()
+            // | MixHash(re)
             // | MixKey(DH(e.sec, re))
             // | MixKeyAndHash(DH(e.sec, rs))
             // | MixKeyAndHash(DH(s.sec, re))
-            // | MixKeyAndHash(DH(s.sec, rs))
-            // | MixHash(payload)
             // | payload = RecvAndHash()
-            // | SendAndHash(payload)
+            // | MixHash(payload)
             // | Split()
+            //
             Handshake::KK1 => {
                 if initiator {
                     &[/* send */
                         Mix(Spub, false),
                         Mix(Rs, false),
-                        Mix(Epub, false),
                         SendData(Epub),
-                        Mix(P, false),
                         SendData(P),
                         Stop,
                       /* recv */
-                        Mix(Re, false),
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         MixDh(Esec, Rs, true),
                         MixDh(Ssec, Re, true),
-                        MixDh(Ssec, Rs, true),
-                        Mix(P, true),
                         RecvData(P),
                         Split,
                     ]
@@ -471,75 +1066,156 @@ impl Handshake {
                     &[/* recv */
                         Mix(Rs, false),
                         Mix(Spub, false),
-                        Mix(Re, false),
                         RecvData(Re),
-                        Mix(P, false),
                         RecvData(P),
                         Stop,
                       /* send */
-                        Mix(Epub, false),
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         MixDh(Ssec, Re, true),
                         MixDh(Esec, Rs, true),
-                        MixDh(Ssec, Rs, true),
-                        Mix(P, true),
                         SendData(P),
                         Split,
                     ]
                 }
-            }
+            },
+            // NNpsk2_Strobe Session Setup
+            // =======================
+            //
+            // Initiator                            Responder
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_NNpsk2...")   | InitSymmetric("Noise_NNpsk2...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s = load_key()                     | s = load_key()
+            // | re, rs = NULL                      | re, rs = NULL
+            //
+            // +-- send_message()
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            // 
+            //                      -> e, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //
+            //                                      +-- send_message()
+            //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
+            //                                      | MixKey(DH(e.sec, re))
+            //                                      | MixHash(psk)
+            //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            //
+            //                      <- e, ee, psk, (payload)
+            //
+            // +-- recv_message()
+            // | re = RecvAndHash()
+            // | MixHash(re)
+            // | MixKey(DH(e.sec, re))
+            // | MixHash(psk)
+            // | payload = RecvAndHash()
+            // | MixHash(payload)
+            // | Split()
+            //
+            Handshake::NNpsk2 => {
+                if initiator {
+                    &[/* send */
+                        SendData(Epub),
+                        SendData(P),
+                        Stop,
+                      /* recv */
+                        RecvData(Re),
+                        MixDh(Esec, Re, false),
+                        Mix(Psk, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                } else {
+                    &[/* recv */
+                        RecvData(Re),
+                        RecvData(P),
+                        Stop,
+                      /* send */
+                        SendData(Epub),
+                        MixDh(Esec, Re, false),
+                        Mix(Psk, true),
+                        SendData(P),
+                        Split,
+                    ]
+                }
+            },
+
         }
     }
 
     /// True if handshake pattern requires local secret key
     pub fn needs_local_secret_key(&self, initiator: bool) -> bool {
+        use Handshake::*;
         if initiator {
             match self {
-                Handshake::XX | Handshake::XK1 => true,
-                Handshake::KK1 => false
+                N | NN | NK | NX | NNpsk2 => false,
+                K | X | KK | XX | IK | XK1 | KK1 => true,
             }
         } else {
             match self {
-                Handshake::XX => true,
-                Handshake::XK1 | Handshake::KK1 => false
+                N | NN | NNpsk2 => false,
+                K | X | KK | XX | IK | NK | NX | XK1 | KK1 => true,
             }
         }
     }
 
     /// True if handshake pattern requires remote public key
-    pub  fn needs_remote_public_key(&self, initiator: bool) -> bool {
+    pub fn needs_remote_public_key(&self, initiator: bool) -> bool {
+        use Handshake::*;
         if initiator {
             match self {
-                Handshake::XX => false,
-                Handshake::XK1 | Handshake::KK1 => true
+                N | K | X | KK | IK | NK | XK1 | KK1 => true,
+                NN | XX | NX | NNpsk2 => false,
             }
         } else {
             match self {
-                Handshake::XX | Handshake::XK1 => false,
-                Handshake::KK1 => true
+                K | KK | KK1 => true,
+                N | X | NN | XX | IK | NK | NX | XK1 | NNpsk2 => false,
             }
+        }
+    }
+
+    /// True if the handshake pattern requires a pre-shared key
+    pub fn needs_pre_shared_key(&self, _initiator: bool) -> bool {
+        if *self == Handshake::NNpsk2 {
+            true
+        } else {
+            false
         }
     }
 
     /// True if handshake pattern defers the local DH operation
     pub fn local_dh_is_deferred(&self, initiator: bool) -> bool {
+        use Handshake::*;
         if initiator {
             false
         } else {
             match self {
-                Handshake::XX => false,
-                Handshake::XK1 | Handshake::KK1 => true
+                N | K | X | NN | KK | XX | IK | NK | NX | NNpsk2 => false,
+                XK1 | KK1 => true,
             }
         }
     }
 
     /// True if handshake pattern defers the remote DH operation
     pub fn remote_dh_is_deferred(&self, initiator: bool) -> bool {
+        use Handshake::*;
         if initiator {
             match self {
-                Handshake::XX => false,
-                Handshake::XK1 | Handshake::KK1 => true
+                N | K | X | NN | KK | XX | IK | NK | NX | NNpsk2 => false,
+                XK1 | KK1 => true,
             }
         } else {
             false
@@ -553,9 +1229,18 @@ impl FromStr for Handshake {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use self::Handshake::*;
         match s {
-            "XX" => Ok(XX),
+            "N"   => Ok(N),
+            "K"   => Ok(K),
+            "X"   => Ok(X),
+            "NN"  => Ok(NN),
+            "KK"  => Ok(KK),
+            "XX"  => Ok(XX),
+            "IK"  => Ok(IK),
+            "NK"  => Ok(NK),
+            "NX"  => Ok(NX),
             "XK1" => Ok(XK1),
             "KK1" => Ok(KK1),
+            "NNpsk2" => Ok(NNpsk2),
             _ => Err(Error::Param(ParamError::InvalidHandshake))
         }
     }
@@ -565,9 +1250,18 @@ impl Display for Handshake {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         use self::Handshake::*;
         match self {
-            XX => write!(f, "XX"),
+            N   => write!(f, "N"),
+            K   => write!(f, "K"),
+            X   => write!(f, "X"),
+            NN  => write!(f, "NN"),
+            KK  => write!(f, "KK"),
+            XX  => write!(f, "XX"),
+            IK  => write!(f, "IK"),
+            NK  => write!(f, "NK"),
+            NX  => write!(f, "NX"),
             XK1 => write!(f, "XK1"),
             KK1 => write!(f, "KK1"),
+            NNpsk2 => write!(f, "NNpsk2"),
         }
     }
 }

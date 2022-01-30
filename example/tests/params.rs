@@ -30,7 +30,7 @@ fn test_handshake_string() {
 #[test]
 #[should_panic]
 fn test_handshake_failure() {
-    let _: Handshake = "NK".parse().unwrap();
+    let _: Handshake = "KN".parse().unwrap();
 }
 
 #[test]
@@ -61,20 +61,101 @@ fn test_version_failure() {
 
 #[test]
 fn test_params_string() {
+    // N
+    let d: Params<AsymKeyType> = "Noise_N_25519_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_N_25519_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_N_P256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_N_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_N_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_N_K256_STROBEv1.0.2".to_string());
+
+    // K
+    let d: Params<AsymKeyType> = "Noise_K_25519_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_K_25519_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_K_P256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_K_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_K_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_K_K256_STROBEv1.0.2".to_string());
+
+    // X
+    let d: Params<AsymKeyType> = "Noise_X_25519_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_X_25519_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_X_P256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_X_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_X_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_X_K256_STROBEv1.0.2".to_string());
+
+    // NN
+    let d: Params<AsymKeyType> = "Noise_NN_25519_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NN_25519_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_NN_P256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NN_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_NN_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NN_K256_STROBEv1.0.2".to_string());
+
+    // KK
+    let d: Params<AsymKeyType> = "Noise_KK_25519_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_KK_25519_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_KK_P256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_KK_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_KK_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_KK_K256_STROBEv1.0.2".to_string());
+
+    // XX
     let d: Params<AsymKeyType> = "Noise_XX_25519_STROBEv1.0.2".parse().unwrap();
     assert_eq!(format!("{}", d), "Noise_XX_25519_STROBEv1.0.2".to_string());
     let d: Params<AsymKeyType> = "Noise_XX_P256_STROBEv1.0.2".parse().unwrap();
     assert_eq!(format!("{}", d), "Noise_XX_P256_STROBEv1.0.2".to_string());
     let d: Params<AsymKeyType> = "Noise_XX_K256_STROBEv1.0.2".parse().unwrap();
     assert_eq!(format!("{}", d), "Noise_XX_K256_STROBEv1.0.2".to_string());
+
+    // IK
+    let d: Params<AsymKeyType> = "Noise_IK_25519_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_IK_25519_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_IK_P256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_IK_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_IK_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_IK_K256_STROBEv1.0.2".to_string());
+
+    // NK
+    let d: Params<AsymKeyType> = "Noise_NK_25519_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NK_25519_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_NK_P256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NK_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_NK_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NK_K256_STROBEv1.0.2".to_string());
+
+    // NX
+    let d: Params<AsymKeyType> = "Noise_NX_25519_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NX_25519_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_NX_P256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NX_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_NX_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NX_K256_STROBEv1.0.2".to_string());
+
+    // XK1
     let d: Params<AsymKeyType> = "Noise_XK1_25519_STROBEv1.0.2".parse().unwrap();
     assert_eq!(format!("{}", d), "Noise_XK1_25519_STROBEv1.0.2".to_string());
     let d: Params<AsymKeyType> = "Noise_XK1_P256_STROBEv1.0.2".parse().unwrap();
     assert_eq!(format!("{}", d), "Noise_XK1_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_XK1_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_XK1_K256_STROBEv1.0.2".to_string());
+
+    // KK1
     let d: Params<AsymKeyType> = "Noise_KK1_25519_STROBEv1.0.2".parse().unwrap();
     assert_eq!(format!("{}", d), "Noise_KK1_25519_STROBEv1.0.2".to_string());
     let d: Params<AsymKeyType> = "Noise_KK1_P256_STROBEv1.0.2".parse().unwrap();
     assert_eq!(format!("{}", d), "Noise_KK1_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_KK1_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_KK1_K256_STROBEv1.0.2".to_string());
+
+    // NNpsk2
+    let d: Params<AsymKeyType> = "Noise_NNpsk2_25519_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NNpsk2_25519_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_NNpsk2_P256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NNpsk2_P256_STROBEv1.0.2".to_string());
+    let d: Params<AsymKeyType> = "Noise_NNpsk2_K256_STROBEv1.0.2".parse().unwrap();
+    assert_eq!(format!("{}", d), "Noise_NNpsk2_K256_STROBEv1.0.2".to_string());
 }
 
 #[test]
@@ -82,17 +163,5 @@ fn test_params_failures() {
     let p = Params::<AsymKeyType>::from_str("Disco_XX_25519_STROBEv1.0.2");
     assert!(p.is_err());
     assert_eq!(p.err(), Some(Error::Param(ParamError::InvalidProtocol)));
-
-    let p = Params::<AsymKeyType>::from_str("Noise_NK_25519_STROBEv1.0.2");
-    assert!(p.is_err());
-    assert_eq!(p.err(), Some(Error::Param(ParamError::InvalidHandshake)));
-
-    let p = Params::<AsymKeyType>::from_str("Noise_XK1_BLS12381_STROBEv1.0.2");
-    assert!(p.is_err());
-    assert_eq!(p.err(), Some(Error::Param(ParamError::InvalidKeyType)));
-
-    let p = Params::<AsymKeyType>::from_str("Noise_KK1_P256_STROBEv2.0.0");
-    assert!(p.is_err());
-    assert_eq!(p.err(), Some(Error::Param(ParamError::InvalidStrobeVersion)));
 }
 

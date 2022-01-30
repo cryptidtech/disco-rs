@@ -46,6 +46,9 @@ pub enum BuilderError {
     /// Missing remote public key
     #[error("missing remote public key needed for this handshake pattern")]
     MissingRemotePublicKey,
+    /// Missing pre-shared key
+    #[error("missing pre-shared key needed for this handshake pattern")]
+    MissingPreSharedKey,
     /// Invalid CDE tag
     #[error("invalid CDE tag")]
     InvalidTag,
@@ -75,4 +78,10 @@ pub enum ProtocolError {
     /// Invalid TaggedData length
     #[error("invalid length for tagged data")]
     InvalidBufferLen,
+    /// Sending a pre-shared key is a protocol error
+    #[error("sending pre-shared key error")]
+    SendingPsk,
+    /// Receiving a pre-shared key is a protocol error
+    #[error("receiving pre-shared key error")]
+    ReceivingPsk,
 }

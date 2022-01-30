@@ -99,6 +99,8 @@ where
         es: S,
         /// Optional remote static public key
         rs: P,
+        /// Optional pre-shared key
+        psk: S,
     },
 
     /// Sending/receiving the first message transitions to this state and we
@@ -128,6 +130,8 @@ where
         rs: P,
         /// Remote ephemeral public key
         re: P,
+        /// Optional pre-shared key
+        psk: S,
     },
 
     /// Completing the handshake script transitions to this state which has
@@ -147,6 +151,8 @@ where
         rs: P,
         /// Remote ephemeral public key
         re: P,
+        /// Optional pre-shared key
+        psk: S,
     }
 }
 
@@ -453,6 +459,7 @@ where
         out_of_order: bool, 
         rs: P,
         re: P,
+        psk: S,
     ) -> Self {
         // clone the strobe
         let mut so = strobe.clone();
@@ -483,6 +490,7 @@ where
             out_of_order: out_of_order,
             rs: rs,
             re: re,
+            psk: psk,
         }
     }
 
@@ -493,7 +501,7 @@ where
             // first time either send/recv has been called so generate ephemeral
             // if needed, transition to handshake state and continue
             Session::Initialized {
-                strobe, params, initiator, out_of_order, ss, sp, ep, es, rs } => {
+                strobe, params, initiator, out_of_order, ss, sp, ep, es, rs, psk } => {
 
                 // get the handshake pattern
                 let h = HandshakeState::new(params.handshake, *initiator);
@@ -521,6 +529,7 @@ where
                     es: es,
                     rs: rs.clone(),
                     re: P::default(),
+                    psk: psk.clone(),
                 };
 
                 // call send_message recursively now that we're in the Handshake state
@@ -530,7 +539,7 @@ where
             Session::Handshake {
                 ref mut strobe, params, handshake_state, initiator, out_of_order,
                 ref mut is_keyed, ref mut sp, ref mut ss, ref mut ep, ref mut es,
-                ref mut rs, ref mut re } => {
+                ref mut rs, ref mut re, psk } => {
 
                 use HandshakeOp::*;
                 use HandshakeData::*;
@@ -558,6 +567,7 @@ where
                                     Rs   => rs,
                                     Re   => re,
                                     P    => in_data,
+                                    Psk  => psk,
                                 };
 
                                 // mix the data into the strobe state
@@ -618,6 +628,7 @@ where
                                     Rs   => rs,
                                     Re   => re,
                                     P    => in_data,
+                                    Psk  => { return Err(Error::Protocol(ProtocolError::SendingPsk)); }
                                 };
 
                                 // mix and send data to the out_data
@@ -635,7 +646,7 @@ where
                             // the handshake process has completed and it is
                             // time to transition into the transport state
                             Split => {
-                                *self = Self::split(strobe, params, *initiator, *out_of_order, rs.clone(), re.clone());
+                                *self = Self::split(strobe, params, *initiator, *out_of_order, rs.clone(), re.clone(), psk.clone());
                                 return Ok(out_idx);
                             },
                         }
@@ -658,7 +669,7 @@ where
             // first time either send/recv has been called so generate ephemeral
             // if needed, transition to handshake state and continue
             Session::Initialized {
-                strobe, params, initiator, out_of_order, ss, sp, ep, es, rs } => {
+                strobe, params, initiator, out_of_order, ss, sp, ep, es, rs, psk } => {
 
                 // get the handshake pattern
                 let h = HandshakeState::new(params.handshake, *initiator);
@@ -686,6 +697,7 @@ where
                     es: es,
                     rs: rs.clone(),
                     re: P::default(),
+                    psk: psk.clone(),
                 };
 
                 // call recv_message recursively now that we're in the Handshake state
@@ -695,7 +707,7 @@ where
             Session::Handshake {
                 ref mut strobe, params, handshake_state, initiator, out_of_order,
                 ref mut is_keyed, ref mut sp, ref mut ss, ref mut ep, ref mut es,
-                ref mut rs, ref mut re } => {
+                ref mut rs, ref mut re, psk } => {
 
                 use HandshakeOp::*;
                 use HandshakeData::*;
@@ -723,6 +735,7 @@ where
                                     Rs   => rs,
                                     Re   => re,
                                     P    => out_data,
+                                    Psk  => psk,
                                 };
 
                                 // mix the data into the strobe state
@@ -787,6 +800,7 @@ where
                                     Rs   => rs,
                                     Re   => re,
                                     P    => out_data,
+                                    Psk  => { return Err(Error::Protocol(ProtocolError::ReceivingPsk)); }
                                 };
 
                                 // read the CDE tag and data from the message buffer
@@ -800,7 +814,7 @@ where
                             // the handshake process has completed and it is
                             // time to transition into the transport state
                             Split => {
-                                *self = Self::split(strobe, params, *initiator, *out_of_order, rs.clone(), re.clone());
+                                *self = Self::split(strobe, params, *initiator, *out_of_order, rs.clone(), re.clone(), psk.clone());
                                 return Ok(in_idx);
                             },
                         }
