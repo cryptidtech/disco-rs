@@ -1,7 +1,7 @@
-use cde::{CryptoData, ENCODER, Tag, TagBuilder};
+use cde::{CryptoData, Tag, TagBuilder, ENCODER};
 use core::fmt::{Display, Formatter, Result as FmtResult};
 use disco_rs::{
-    error::{Error, ProtocolError, BuilderError},
+    error::{BuilderError, Error, ProtocolError},
     key::TaggedData,
     Result,
 };
@@ -16,12 +16,11 @@ pub struct TaggedSliceBuilder<'a, const N: usize> {
 }
 
 impl<'a, const N: usize> TaggedSliceBuilder<'a, N> {
-
     /// construct a new builder with the tag and data length
     pub fn new(tag: &'a str, len: usize) -> Self {
         TaggedSliceBuilder::<N> {
-            tag: tag,
-            len: len,
+            tag,
+            len,
             bytes: None,
         }
     }
@@ -36,7 +35,11 @@ impl<'a, const N: usize> TaggedSliceBuilder<'a, N> {
     pub fn build(&self) -> Result<TaggedSlice<N>> {
         if let Some(b) = self.bytes {
             let mut ts = TaggedSlice::<N>::from(b);
-            ts.set_tag(&TagBuilder::from_tag(self.tag).build().map_err(|_| ProtocolError::InvalidTag)?);
+            ts.set_tag(
+                &TagBuilder::from_tag(self.tag)
+                    .build()
+                    .map_err(|_| ProtocolError::InvalidTag)?,
+            );
             ts.set_length(self.len)?;
             Ok(ts)
         } else {
@@ -47,12 +50,11 @@ impl<'a, const N: usize> TaggedSliceBuilder<'a, N> {
 
 /// Holds key data of a fixed length
 #[derive(Copy, Clone, Debug, PartialEq, Zeroize)]
-pub struct TaggedSlice<const N: usize>
-{
+pub struct TaggedSlice<const N: usize> {
     #[zeroize(skip)]
     tag: Tag,
     len: usize,
-    bytes: [u8; N]
+    bytes: [u8; N],
 }
 
 impl<const N: usize> TaggedSlice<N> {
@@ -71,7 +73,7 @@ impl<const N: usize> CryptoData for TaggedSlice<N> {
         // copy the tag bytes
         let len = self.tag.bytes(&mut buf[0..self.tag.len()]);
         // copy the data bytes
-        buf[len..len+N].copy_from_slice(&self.bytes);
+        buf[len..len + N].copy_from_slice(&self.bytes);
         len + N
     }
 
@@ -83,7 +85,7 @@ impl<const N: usize> CryptoData for TaggedSlice<N> {
         // encode the tag
         let len = self.tag.encode(&mut buf[0..self.tag.encode_len()]);
         // encode the data
-        ENCODER.encode_mut(&self.bytes, &mut buf[len..len+ENCODER.encode_len(N)]);
+        ENCODER.encode_mut(&self.bytes, &mut buf[len..len + ENCODER.encode_len(N)]);
         self.encode_len()
     }
 }
@@ -172,5 +174,3 @@ impl<const N: usize> AsMut<[u8]> for TaggedSlice<N> {
         &mut self.bytes
     }
 }
-
-

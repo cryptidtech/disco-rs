@@ -67,7 +67,7 @@ no-std = [
 cde = { version = "0.3.1", default-features = false }
 crypto-bigint = "0.2"
 curve25519-dalek = { version = "4.0.0-pre.1", default-features = false, optional = true }
-disco-rs = { version = "0.1", path = "../", default-features = false }
+disco-rs = { version = "0.2", path = "../", default-features = false }
 ed25519-dalek = { version = "1.0", default-features = false, optional = true }
 elliptic-curve = { version = "0.10", features = ["ecdh"], optional = true }
 heapless = { version = "0.7", optional = true }

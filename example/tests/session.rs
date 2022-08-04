@@ -1,13 +1,9 @@
 use cde::{idx, TagBuilder};
-use disco_rs::{
-    builder::Builder,
-    key::TaggedData,
-    params::Params,
-};
 use disco_ecdh_example::{
+    key::soft::{x25519, AsymKeyType},
     tagged::{TaggedSlice, TaggedSliceBuilder},
-    key::soft::{AsymKeyType, x25519},
 };
+use disco_rs::{builder::Builder, key::TaggedData, params::Params};
 use std::str::FromStr;
 use zeroize::Zeroize;
 
@@ -15,8 +11,18 @@ use zeroize::Zeroize;
 mod inner;
 use inner::*;
 
-type AliceKeys = (TaggedSlice<33>, TaggedSlice<32>, TaggedSlice<33>, TaggedSlice<32>);
-type BobKeys = (TaggedSlice<33>, TaggedSlice<32>, TaggedSlice<33>, TaggedSlice<32>);
+type AliceKeys = (
+    TaggedSlice<33>,
+    TaggedSlice<32>,
+    TaggedSlice<33>,
+    TaggedSlice<32>,
+);
+type BobKeys = (
+    TaggedSlice<33>,
+    TaggedSlice<32>,
+    TaggedSlice<33>,
+    TaggedSlice<32>,
+);
 
 #[test]
 fn n_x25519_handshake() {
@@ -43,7 +49,6 @@ fn n_p256_handshake() {
 }
 
 fn n_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     let (asp, ass, aep, aes) = alice;
     let (bsp, bss, bep, bes) = bob;
 
@@ -52,27 +57,31 @@ fn n_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .remote_static_public_key(&bsp)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .remote_static_public_key(&bsp)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     /*****************/
     /*   Bob Setup   */
     /*****************/
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     /***********/
     /*  Alice  */
@@ -82,10 +91,13 @@ fn n_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     // -> e, es
     let alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
         .from_bytes(b"hello")
-        .build().unwrap();
+        .build()
+        .unwrap();
 
     let mut alice_to_bob = [0u8; 1024];
-    let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+    let _len = alice
+        .send_message(&alice_out_payload, &mut alice_to_bob)
+        .unwrap();
 
     assert!(alice.is_keyed());
     assert!(alice.is_transport());
@@ -96,7 +108,9 @@ fn n_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     let mut bob_in_payload = TaggedSlice::<1024>::default();
-    let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+    let _len = bob
+        .recv_message(&alice_to_bob, &mut bob_in_payload)
+        .unwrap();
 
     assert_eq!(bob_in_payload.length(), 5);
     assert_eq!(alice_out_payload, bob_in_payload);
@@ -129,7 +143,6 @@ fn k_p256_handshake() {
 }
 
 fn k_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     let (asp, ass, aep, aes) = alice;
     let (bsp, bss, bep, bes) = bob;
 
@@ -138,28 +151,32 @@ fn k_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .remote_static_public_key(&bsp)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .remote_static_public_key(&bsp)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     /*****************/
     /*   Bob Setup   */
     /*****************/
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .remote_static_public_key(&asp)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .remote_static_public_key(&asp)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     /***********/
     /*  Alice  */
@@ -169,10 +186,13 @@ fn k_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     // -> e, es, ss
     let alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
         .from_bytes(b"hello")
-        .build().unwrap();
+        .build()
+        .unwrap();
 
     let mut alice_to_bob = [0u8; 1024];
-    let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+    let _len = alice
+        .send_message(&alice_out_payload, &mut alice_to_bob)
+        .unwrap();
 
     assert!(alice.is_keyed());
     assert!(alice.is_transport());
@@ -183,7 +203,9 @@ fn k_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     let mut bob_in_payload = TaggedSlice::<1024>::default();
-    let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+    let _len = bob
+        .recv_message(&alice_to_bob, &mut bob_in_payload)
+        .unwrap();
 
     assert_eq!(bob_in_payload.length(), 5);
     assert_eq!(alice_out_payload, bob_in_payload);
@@ -216,7 +238,6 @@ fn x_p256_handshake() {
 }
 
 fn x_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     let (asp, ass, aep, aes) = alice;
     let (bsp, bss, bep, bes) = bob;
 
@@ -225,27 +246,31 @@ fn x_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .remote_static_public_key(&bsp)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .remote_static_public_key(&bsp)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     /*****************/
     /*   Bob Setup   */
     /*****************/
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     /***********/
     /*  Alice  */
@@ -255,10 +280,13 @@ fn x_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     // -> e, es, s, ss
     let alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
         .from_bytes(b"hello")
-        .build().unwrap();
+        .build()
+        .unwrap();
 
     let mut alice_to_bob = [0u8; 1024];
-    let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+    let _len = alice
+        .send_message(&alice_out_payload, &mut alice_to_bob)
+        .unwrap();
 
     assert!(alice.is_keyed());
     assert!(alice.is_transport());
@@ -269,7 +297,9 @@ fn x_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     let mut bob_in_payload = TaggedSlice::<1024>::default();
-    let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+    let _len = bob
+        .recv_message(&alice_to_bob, &mut bob_in_payload)
+        .unwrap();
 
     assert_eq!(bob_in_payload.length(), 5);
     assert_eq!(alice_out_payload, bob_in_payload);
@@ -326,7 +356,6 @@ fn kk_p256_handshake() {
 }
 
 fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     let (asp, ass, aep, aes) = alice;
     let (bsp, bss, bep, bes) = bob;
 
@@ -335,14 +364,16 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .remote_static_public_key(&bsp)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .remote_static_public_key(&bsp)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     // message buffer
     let mut alice_to_bob = [0u8; 1024];
@@ -356,14 +387,16 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .remote_static_public_key(&asp)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .remote_static_public_key(&asp)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     // message buffer
     let mut bob_to_alice = [0u8; 1024];
@@ -379,12 +412,14 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     // send the first handshake message without a payload
     // -> e, es, ss
     {
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         let tag = TagBuilder::from_bytes(&alice_to_bob).build().unwrap();
-        assert_eq!(tag.class(), idx('f'));      /* strobe */
-        assert_eq!(tag.subclass(), idx('c'));   /* clr */
-        assert_eq!(tag.subsubclass(), 1);       /* data recv */
+        assert_eq!(tag.class(), idx('f')); /* strobe */
+        assert_eq!(tag.subclass(), idx('c')); /* clr */
+        assert_eq!(tag.subsubclass(), 1); /* data recv */
         assert!(alice.is_keyed());
     }
 
@@ -394,7 +429,9 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     {
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         let re = bob.get_remote_ephemeral().unwrap();
         assert_eq!(re, aep);
@@ -402,11 +439,12 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         assert!(bob.is_keyed());
     }
 
-   
     // send the second message without a payload
     // <- e, ee, se
     {
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         // make sure we're in encrypted mode
         assert!(bob.is_transport());
@@ -419,7 +457,9 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the second message and verify empty payload
     {
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         let re = alice.get_remote_ephemeral().unwrap();
         assert_eq!(re, bep);
@@ -433,12 +473,15 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"hello")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         alice_to_bob.zeroize();
-        
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         assert!(alice.is_transport());
         assert!(alice.is_keyed());
@@ -453,7 +496,9 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         bob_in_payload.zeroize();
 
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         assert_eq!(bob_in_payload.length(), 5);
         assert_eq!(alice_out_payload, bob_in_payload);
@@ -466,12 +511,15 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         bob_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"world")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         bob_to_alice.zeroize();
-        
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         assert!(bob.is_keyed());
     }
@@ -485,7 +533,9 @@ fn kk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         alice_in_payload.zeroize();
 
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         assert_eq!(alice_in_payload.length(), 5);
         assert_eq!(bob_out_payload, alice_in_payload);
@@ -518,20 +568,21 @@ fn xx_p256_handshake() {
 }
 
 fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     /*****************/
     /*  Alice Setup  */
     /*****************/
     let (asp, ass, aep, aes) = alice;
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     // message buffer
     let mut alice_to_bob = [0u8; 1024];
@@ -546,13 +597,15 @@ fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     let (bsp, bss, bep, bes) = bob;
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     // message buffer
     let mut bob_to_alice = [0u8; 1024];
@@ -567,12 +620,14 @@ fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // send the first handshake message without a payload
     {
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         let tag = TagBuilder::from_bytes(&alice_to_bob).build().unwrap();
-        assert_eq!(tag.class(), idx('f'));      /* strobe */
-        assert_eq!(tag.subclass(), idx('c'));   /* clr */
-        assert_eq!(tag.subsubclass(), 1);       /* data recv */
+        assert_eq!(tag.class(), idx('f')); /* strobe */
+        assert_eq!(tag.subclass(), idx('c')); /* clr */
+        assert_eq!(tag.subsubclass(), 1); /* data recv */
         assert_eq!(alice.is_keyed(), false);
     }
 
@@ -582,7 +637,9 @@ fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     {
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         let re = bob.get_remote_ephemeral().unwrap();
         assert_eq!(re, aep);
@@ -590,10 +647,11 @@ fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         assert_eq!(bob.is_keyed(), false);
     }
 
-   
     // send the second message without a payload
     {
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         // make sure we're in encrypted mode
         assert!(bob.is_keyed());
@@ -605,7 +663,9 @@ fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the second message and verify empty payload
     {
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         let re = alice.get_remote_ephemeral().unwrap();
         assert_eq!(re, bep);
@@ -618,12 +678,15 @@ fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"hello")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         alice_to_bob.zeroize();
-        
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         assert!(alice.is_transport());
         assert!(alice.is_keyed());
@@ -638,7 +701,9 @@ fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         bob_in_payload.zeroize();
 
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         assert_eq!(bob_in_payload.length(), 5);
         assert_eq!(alice_out_payload, bob_in_payload);
@@ -651,12 +716,15 @@ fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         bob_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"world")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         bob_to_alice.zeroize();
-        
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         assert!(bob.is_keyed());
     }
@@ -670,7 +738,9 @@ fn xx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         alice_in_payload.zeroize();
 
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         assert_eq!(alice_in_payload.length(), 5);
         assert_eq!(bob_out_payload, alice_in_payload);
@@ -703,7 +773,6 @@ fn ik_p256_handshake() {
 }
 
 fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     let (asp, ass, aep, aes) = alice;
     let (bsp, bss, bep, bes) = bob;
 
@@ -712,14 +781,16 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .remote_static_public_key(&bsp)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .remote_static_public_key(&bsp)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     // message buffer
     let mut alice_to_bob = [0u8; 1024];
@@ -733,13 +804,15 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     // message buffer
     let mut bob_to_alice = [0u8; 1024];
@@ -755,12 +828,14 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     // send the first handshake message without a payload
     // -> e, es, s, ss
     {
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         let tag = TagBuilder::from_bytes(&alice_to_bob).build().unwrap();
-        assert_eq!(tag.class(), idx('f'));      /* strobe */
-        assert_eq!(tag.subclass(), idx('c'));   /* clr */
-        assert_eq!(tag.subsubclass(), 1);       /* data recv */
+        assert_eq!(tag.class(), idx('f')); /* strobe */
+        assert_eq!(tag.subclass(), idx('c')); /* clr */
+        assert_eq!(tag.subsubclass(), 1); /* data recv */
         assert!(alice.is_keyed());
     }
 
@@ -770,7 +845,9 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     {
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         let re = bob.get_remote_ephemeral().unwrap();
         assert_eq!(re, aep);
@@ -778,11 +855,12 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         assert!(bob.is_keyed());
     }
 
-   
     // send the second message without a payload
     // <- e, ee, se
     {
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         // make sure we're in encrypted mode
         assert!(bob.is_transport());
@@ -795,7 +873,9 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the second message and verify empty payload
     {
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         let re = alice.get_remote_ephemeral().unwrap();
         assert_eq!(re, bep);
@@ -809,12 +889,15 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"hello")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         alice_to_bob.zeroize();
-        
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         assert!(alice.is_transport());
         assert!(alice.is_keyed());
@@ -829,7 +912,9 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         bob_in_payload.zeroize();
 
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         assert_eq!(bob_in_payload.length(), 5);
         assert_eq!(alice_out_payload, bob_in_payload);
@@ -842,12 +927,15 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         bob_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"world")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         bob_to_alice.zeroize();
-        
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         assert!(bob.is_keyed());
     }
@@ -861,7 +949,223 @@ fn ik_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         alice_in_payload.zeroize();
 
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
+
+        assert_eq!(alice_in_payload.length(), 5);
+        assert_eq!(bob_out_payload, alice_in_payload);
+        assert!(alice.is_keyed());
+    }
+}
+
+#[test]
+fn ix_x25519_handshake() {
+    // Noise, IX handshake, Curve25519 keys, and Strobe
+    let params = Params::<AsymKeyType>::from_str("Noise_IX_25519_STROBEv1.0.2").unwrap();
+
+    ix_handshake(alice_x25519_keys(), bob_x25519_keys(), &params);
+}
+
+#[test]
+fn ix_k256_handshake() {
+    // Noise, IX handshake, NIST K256 keys, and Strobe
+    let params = Params::<AsymKeyType>::from_str("Noise_IX_K256_STROBEv1.0.2").unwrap();
+
+    ix_handshake(alice_k256_keys(), bob_k256_keys(), &params);
+}
+
+#[test]
+fn ix_p256_handshake() {
+    // Noise, IX handshake, NIST K256 keys, and Strobe
+    let params = Params::<AsymKeyType>::from_str("Noise_IX_P256_STROBEv1.0.2").unwrap();
+
+    ix_handshake(alice_p256_keys(), bob_p256_keys(), &params);
+}
+
+fn ix_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
+    let (asp, ass, aep, aes) = alice;
+    let (bsp, bss, bep, bes) = bob;
+
+    /*****************/
+    /*  Alice Setup  */
+    /*****************/
+
+    // generate the disco state for alice
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
+
+    // message buffer
+    let mut alice_to_bob = [0u8; 1024];
+
+    // payloads
+    let mut alice_in_payload = TaggedSlice::<1024>::default();
+    let mut alice_out_payload = TaggedSlice::<1024>::default();
+
+    /*****************/
+    /*   Bob Setup   */
+    /*****************/
+
+    // generate the disco state for bob
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
+
+    // message buffer
+    let mut bob_to_alice = [0u8; 1024];
+
+    // payloads
+    let mut bob_in_payload = TaggedSlice::<1024>::default();
+    let mut bob_out_payload = TaggedSlice::<1024>::default();
+
+    /***********/
+    /*  Alice  */
+    /***********/
+
+    // send the first handshake message without a payload
+    // -> e, s
+    {
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
+
+        let tag = TagBuilder::from_bytes(&alice_to_bob).build().unwrap();
+        assert_eq!(tag.class(), idx('f')); /* strobe */
+        assert_eq!(tag.subclass(), idx('c')); /* clr */
+        assert_eq!(tag.subsubclass(), 1); /* data recv */
+        assert!(!alice.is_keyed());
+    }
+
+    /***********/
+    /*   Bob   */
+    /***********/
+
+    // receive the first message and verify empty payload
+    {
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
+
+        let re = bob.get_remote_ephemeral().unwrap();
+        assert_eq!(re, aep);
+        let rs = bob.get_remote_static().unwrap();
+        assert_eq!(rs, asp);
+        assert_eq!(bob_in_payload.length(), 0);
+        assert!(!bob.is_keyed());
+    }
+
+    // send the second message without a payload
+    // <- e, ee, se, s, se
+    {
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
+
+        // make sure we're in encrypted mode
+        assert!(bob.is_transport());
+        assert!(bob.is_keyed());
+    }
+
+    /***********/
+    /*  Alice  */
+    /***********/
+
+    // receive the second message and verify empty payload
+    {
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
+
+        let re = alice.get_remote_ephemeral().unwrap();
+        assert_eq!(re, bep);
+        let rs = alice.get_remote_static().unwrap();
+        assert_eq!(rs, bsp);
+        assert_eq!(alice_in_payload.length(), 0);
+        assert!(alice.is_transport());
+        assert!(alice.is_keyed());
+    }
+
+    // send the third message with "hello" payload
+    {
+        // set the payload
+        alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
+            .from_bytes(b"hello")
+            .build()
+            .unwrap();
+
+        // clear the buffer
+        alice_to_bob.zeroize();
+
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
+
+        assert!(alice.is_transport());
+        assert!(alice.is_keyed());
+    }
+
+    /***********/
+    /*   Bob   */
+    /***********/
+
+    // receive the third message and verify encrypted payload
+    {
+        // clear the incoming payload
+        bob_in_payload.zeroize();
+
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
+
+        assert_eq!(bob_in_payload.length(), 5);
+        assert_eq!(alice_out_payload, bob_in_payload);
+        assert!(bob.is_transport());
+        assert!(bob.is_keyed());
+    }
+
+    // send an encrypted payload in transport mode
+    {
+        // set the payload
+        bob_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
+            .from_bytes(b"world")
+            .build()
+            .unwrap();
+
+        // clear the buffer
+        bob_to_alice.zeroize();
+
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
+
+        assert!(bob.is_keyed());
+    }
+
+    /***********/
+    /*  Alice  */
+    /***********/
+
+    // receive the second message and verify empty payload
+    {
+        // clear the incoming payload
+        alice_in_payload.zeroize();
+
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         assert_eq!(alice_in_payload.length(), 5);
         assert_eq!(bob_out_payload, alice_in_payload);
@@ -894,7 +1198,6 @@ fn nk_p256_handshake() {
 }
 
 fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     let (asp, ass, aep, aes) = alice;
     let (bsp, bss, bep, bes) = bob;
 
@@ -903,14 +1206,16 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .remote_static_public_key(&bsp)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .remote_static_public_key(&bsp)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     // message buffer
     let mut alice_to_bob = [0u8; 1024];
@@ -924,13 +1229,15 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     // message buffer
     let mut bob_to_alice = [0u8; 1024];
@@ -946,12 +1253,14 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     // send the first handshake message without a payload
     // -> e, es, s, ss
     {
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         let tag = TagBuilder::from_bytes(&alice_to_bob).build().unwrap();
-        assert_eq!(tag.class(), idx('f'));      /* strobe */
-        assert_eq!(tag.subclass(), idx('c'));   /* clr */
-        assert_eq!(tag.subsubclass(), 1);       /* data recv */
+        assert_eq!(tag.class(), idx('f')); /* strobe */
+        assert_eq!(tag.subclass(), idx('c')); /* clr */
+        assert_eq!(tag.subsubclass(), 1); /* data recv */
         assert!(alice.is_keyed());
     }
 
@@ -961,7 +1270,9 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     {
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         let re = bob.get_remote_ephemeral().unwrap();
         assert_eq!(re, aep);
@@ -969,11 +1280,12 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         assert!(bob.is_keyed());
     }
 
-   
     // send the second message without a payload
     // <- e, ee, se
     {
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         // make sure we're in encrypted mode
         assert!(bob.is_transport());
@@ -986,7 +1298,9 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the second message and verify empty payload
     {
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         let re = alice.get_remote_ephemeral().unwrap();
         assert_eq!(re, bep);
@@ -1000,12 +1314,15 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"hello")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         alice_to_bob.zeroize();
-        
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         assert!(alice.is_transport());
         assert!(alice.is_keyed());
@@ -1020,7 +1337,9 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         bob_in_payload.zeroize();
 
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         assert_eq!(bob_in_payload.length(), 5);
         assert_eq!(alice_out_payload, bob_in_payload);
@@ -1033,12 +1352,15 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         bob_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"world")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         bob_to_alice.zeroize();
-        
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         assert!(bob.is_keyed());
     }
@@ -1052,7 +1374,9 @@ fn nk_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         alice_in_payload.zeroize();
 
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         assert_eq!(alice_in_payload.length(), 5);
         assert_eq!(bob_out_payload, alice_in_payload);
@@ -1085,7 +1409,6 @@ fn nx_p256_handshake() {
 }
 
 fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     let (asp, ass, aep, aes) = alice;
     let (bsp, bss, bep, bes) = bob;
 
@@ -1094,13 +1417,15 @@ fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     // message buffer
     let mut alice_to_bob = [0u8; 1024];
@@ -1114,13 +1439,15 @@ fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     // message buffer
     let mut bob_to_alice = [0u8; 1024];
@@ -1136,12 +1463,14 @@ fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     // send the first handshake message without a payload
     // -> e
     {
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         let tag = TagBuilder::from_bytes(&alice_to_bob).build().unwrap();
-        assert_eq!(tag.class(), idx('f'));      /* strobe */
-        assert_eq!(tag.subclass(), idx('c'));   /* clr */
-        assert_eq!(tag.subsubclass(), 1);       /* data recv */
+        assert_eq!(tag.class(), idx('f')); /* strobe */
+        assert_eq!(tag.subclass(), idx('c')); /* clr */
+        assert_eq!(tag.subsubclass(), 1); /* data recv */
     }
 
     /***********/
@@ -1150,18 +1479,21 @@ fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     {
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         let re = bob.get_remote_ephemeral().unwrap();
         assert_eq!(re, aep);
         assert_eq!(bob_in_payload.length(), 0);
     }
 
-   
     // send the second message without a payload
     // <- e, ee, s, es
     {
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         // make sure we're in encrypted mode
         assert!(bob.is_transport());
@@ -1174,7 +1506,9 @@ fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the second message and verify empty payload
     {
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         let re = alice.get_remote_ephemeral().unwrap();
         assert_eq!(re, bep);
@@ -1188,12 +1522,15 @@ fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"hello")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         alice_to_bob.zeroize();
-        
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         assert!(alice.is_transport());
         assert!(alice.is_keyed());
@@ -1208,7 +1545,9 @@ fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         bob_in_payload.zeroize();
 
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         assert_eq!(bob_in_payload.length(), 5);
         assert_eq!(alice_out_payload, bob_in_payload);
@@ -1221,12 +1560,15 @@ fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         bob_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"world")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         bob_to_alice.zeroize();
-        
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         assert!(bob.is_keyed());
     }
@@ -1240,7 +1582,9 @@ fn nx_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         alice_in_payload.zeroize();
 
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         assert_eq!(alice_in_payload.length(), 5);
         assert_eq!(bob_out_payload, alice_in_payload);
@@ -1273,7 +1617,6 @@ fn xk1_p256_handshake() {
 }
 
 fn xk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     let (asp, ass, aep, aes) = alice;
     let (bsp, bss, bep, bes) = bob;
 
@@ -1282,14 +1625,16 @@ fn xk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .remote_static_public_key(&bsp)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .remote_static_public_key(&bsp)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     // message buffer
     let mut alice_to_bob = [0u8; 1024];
@@ -1303,13 +1648,15 @@ fn xk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     // message buffer
     let mut bob_to_alice = [0u8; 1024];
@@ -1324,12 +1671,14 @@ fn xk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // -> e
     {
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         let tag = TagBuilder::from_bytes(&alice_to_bob).build().unwrap();
-        assert_eq!(tag.class(), idx('f'));      /* strobe */
-        assert_eq!(tag.subclass(), idx('c'));   /* clr */
-        assert_eq!(tag.subsubclass(), 1);       /* data recv */
+        assert_eq!(tag.class(), idx('f')); /* strobe */
+        assert_eq!(tag.subclass(), idx('c')); /* clr */
+        assert_eq!(tag.subsubclass(), 1); /* data recv */
         assert_eq!(alice.is_keyed(), false);
     }
 
@@ -1339,7 +1688,9 @@ fn xk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     {
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         let re = bob.get_remote_ephemeral().unwrap();
         assert_eq!(re, aep);
@@ -1347,10 +1698,11 @@ fn xk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         assert_eq!(bob.is_keyed(), false);
     }
 
-   
     // <- e, ee, es
     {
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         // make sure we're in encrypted mode
         assert!(bob.is_keyed());
@@ -1362,7 +1714,9 @@ fn xk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the second message and verify empty payload
     {
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         let re = alice.get_remote_ephemeral().unwrap();
         assert_eq!(re, bep);
@@ -1375,12 +1729,15 @@ fn xk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"hello")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         alice_to_bob.zeroize();
-        
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         assert!(alice.is_transport());
         assert!(alice.is_keyed());
@@ -1395,7 +1752,9 @@ fn xk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         bob_in_payload.zeroize();
 
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         assert_eq!(bob_in_payload.length(), 5);
         assert_eq!(alice_out_payload, bob_in_payload);
@@ -1429,7 +1788,6 @@ fn kk1_p256_handshake() {
 }
 
 fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     let (asp, ass, aep, aes) = alice;
     let (bsp, bss, bep, bes) = bob;
 
@@ -1438,14 +1796,16 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .remote_static_public_key(&bsp)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .remote_static_public_key(&bsp)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     // message buffer
     let mut alice_to_bob = [0u8; 1024];
@@ -1459,14 +1819,16 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     /*****************/
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .remote_static_public_key(&asp)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .remote_static_public_key(&asp)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     // message buffer
     let mut bob_to_alice = [0u8; 1024];
@@ -1482,12 +1844,14 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
     // send the first handshake message without a payload
     // -> e
     {
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         let tag = TagBuilder::from_bytes(&alice_to_bob).build().unwrap();
-        assert_eq!(tag.class(), idx('f'));      /* strobe */
-        assert_eq!(tag.subclass(), idx('c'));   /* clr */
-        assert_eq!(tag.subsubclass(), 1);       /* data recv */
+        assert_eq!(tag.class(), idx('f')); /* strobe */
+        assert_eq!(tag.subclass(), idx('c')); /* clr */
+        assert_eq!(tag.subsubclass(), 1); /* data recv */
         assert_eq!(alice.is_keyed(), false);
     }
 
@@ -1497,7 +1861,9 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the first message and verify empty payload
     {
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         let re = bob.get_remote_ephemeral().unwrap();
         assert_eq!(re, aep);
@@ -1505,11 +1871,12 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         assert_eq!(bob.is_keyed(), false);
     }
 
-   
     // send second handshake message without payload
     // <- e, ee, es, se, ss
     {
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         // make sure we're in encrypted mode
         assert!(bob.is_keyed());
@@ -1521,7 +1888,9 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
 
     // receive the second message and verify empty payload
     {
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         let re = alice.get_remote_ephemeral().unwrap();
         assert_eq!(re, bep);
@@ -1535,12 +1904,15 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         alice_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"hello")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         alice_to_bob.zeroize();
-        
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         assert!(alice.is_transport());
         assert!(alice.is_keyed());
@@ -1555,7 +1927,9 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         bob_in_payload.zeroize();
 
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         assert_eq!(bob_in_payload.length(), 5);
         assert_eq!(alice_out_payload, bob_in_payload);
@@ -1568,12 +1942,15 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // set the payload
         bob_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
             .from_bytes(b"world")
-            .build().unwrap();
+            .build()
+            .unwrap();
 
         // clear the buffer
         bob_to_alice.zeroize();
-        
-        let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+
+        let _len = bob
+            .send_message(&bob_out_payload, &mut bob_to_alice)
+            .unwrap();
 
         assert!(bob.is_keyed());
     }
@@ -1587,7 +1964,9 @@ fn kk1_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
         // clear the incoming payload
         alice_in_payload.zeroize();
 
-        let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+        let _len = alice
+            .recv_message(&bob_to_alice, &mut alice_in_payload)
+            .unwrap();
 
         assert_eq!(alice_in_payload.length(), 5);
         assert_eq!(bob_out_payload, alice_in_payload);
@@ -1620,7 +1999,6 @@ fn nnpsk2_p256_handshake() {
 }
 
 fn nnpsk2_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>) {
-
     // get the pre-shared key
     let psk = psk();
 
@@ -1630,14 +2008,16 @@ fn nnpsk2_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>
     let (asp, ass, aep, aes) = alice;
 
     // generate the disco state for alice
-    let mut alice = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&ass)
-        .local_static_public_key(&asp)
-        .local_ephemeral_secret_key(&aes)
-        .local_ephemeral_public_key(&aep)
-        .pre_shared_key(&psk)
-        .out_of_order(false)
-        .build_initiator().unwrap();
+    let mut alice =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&ass)
+            .local_static_public_key(&asp)
+            .local_ephemeral_secret_key(&aes)
+            .local_ephemeral_public_key(&aep)
+            .pre_shared_key(&psk)
+            .out_of_order(false)
+            .build_initiator()
+            .unwrap();
 
     // message buffer
     let mut alice_to_bob = [0u8; 1024];
@@ -1652,14 +2032,16 @@ fn nnpsk2_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>
     let (bsp, bss, bep, bes) = bob;
 
     // generate the disco state for bob
-    let mut bob = Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
-        .local_static_secret_key(&bss)
-        .local_static_public_key(&bsp)
-        .local_ephemeral_secret_key(&bes)
-        .local_ephemeral_public_key(&bep)
-        .pre_shared_key(&psk)
-        .out_of_order(false)
-        .build_responder().unwrap();
+    let mut bob =
+        Builder::<AsymKeyType, x25519::PublicKeySlice, x25519::SecretKeySlice>::new(params)
+            .local_static_secret_key(&bss)
+            .local_static_public_key(&bsp)
+            .local_ephemeral_secret_key(&bes)
+            .local_ephemeral_public_key(&bep)
+            .pre_shared_key(&psk)
+            .out_of_order(false)
+            .build_responder()
+            .unwrap();
 
     // message buffer
     let mut bob_to_alice = [0u8; 1024];
@@ -1673,12 +2055,14 @@ fn nnpsk2_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>
 
     // -> e
     {
-        let _len = alice.send_message(&alice_out_payload, &mut alice_to_bob).unwrap();
+        let _len = alice
+            .send_message(&alice_out_payload, &mut alice_to_bob)
+            .unwrap();
 
         let tag = TagBuilder::from_bytes(&alice_to_bob).build().unwrap();
-        assert_eq!(tag.class(), idx('f'));      /* strobe */
-        assert_eq!(tag.subclass(), idx('c'));   /* clr */
-        assert_eq!(tag.subsubclass(), 1);       /* data recv */
+        assert_eq!(tag.class(), idx('f')); /* strobe */
+        assert_eq!(tag.subclass(), idx('c')); /* clr */
+        assert_eq!(tag.subsubclass(), 1); /* data recv */
         assert_eq!(alice.is_keyed(), false);
     }
 
@@ -1688,7 +2072,9 @@ fn nnpsk2_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>
 
     // receive the first message and verify empty payload
     {
-        let _len = bob.recv_message(&alice_to_bob, &mut bob_in_payload).unwrap();
+        let _len = bob
+            .recv_message(&alice_to_bob, &mut bob_in_payload)
+            .unwrap();
 
         let re = bob.get_remote_ephemeral().unwrap();
         assert_eq!(re, aep);
@@ -1696,15 +2082,17 @@ fn nnpsk2_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>
         assert_eq!(bob.is_keyed(), false);
     }
 
-   
     // <- e, ee, psk
-    
+
     // set the payload
     let bob_out_payload = TaggedSliceBuilder::new("undefined.undefined", 5)
         .from_bytes(b"hello")
-        .build().unwrap();
+        .build()
+        .unwrap();
 
-    let _len = bob.send_message(&bob_out_payload, &mut bob_to_alice).unwrap();
+    let _len = bob
+        .send_message(&bob_out_payload, &mut bob_to_alice)
+        .unwrap();
 
     // make sure we're in encrypted mode
     assert!(bob.is_keyed());
@@ -1715,7 +2103,9 @@ fn nnpsk2_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>
     /***********/
 
     // receive the second message and verify empty payload
-    let _len = alice.recv_message(&bob_to_alice, &mut alice_in_payload).unwrap();
+    let _len = alice
+        .recv_message(&bob_to_alice, &mut alice_in_payload)
+        .unwrap();
 
     let re = alice.get_remote_ephemeral().unwrap();
     assert_eq!(re, bep);
@@ -1724,5 +2114,3 @@ fn nnpsk2_handshake(alice: AliceKeys, bob: BobKeys, params: &Params<AsymKeyType>
     assert!(alice.is_keyed());
     assert!(alice.is_transport());
 }
-
-

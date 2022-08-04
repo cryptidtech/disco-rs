@@ -1,11 +1,11 @@
 use crate::{
     error::{Error, ParamError, ProtocolError},
     inner::get_rng,
-    key::{KeyType, KeyGenerator, KeyAgreement, TaggedData},
-    params::{Params, HandshakeData, HandshakeOp, HandshakeState},
+    key::{KeyAgreement, KeyGenerator, KeyType, TaggedData},
+    params::{HandshakeData, HandshakeOp, HandshakeState, Params},
     Result,
 };
-use cde::{CryptoData, idx, Tag, TagBuilder};
+use cde::{idx, CryptoData, Tag, TagBuilder};
 use strobe_rs::Strobe;
 
 // From the Noise Extension: Disco specification, the meaning of the operations
@@ -153,7 +153,7 @@ where
         re: P,
         /// Optional pre-shared key
         psk: S,
-    }
+    },
 }
 
 impl<'a, T, P, S> Session<'a, T, P, S>
@@ -162,7 +162,6 @@ where
     P: TaggedData<'a> + Clone + Default,
     S: TaggedData<'a> + Clone + Default,
 {
-
     fn strobe_tag_to_message(
         strobe: &mut Strobe,
         is_keyed: bool,
@@ -179,25 +178,25 @@ where
         let mut out_idx = out_offset;
         for tag_idx in (0..tag_len).step_by(3) {
             // copy the next three bytes of tag into the message buffer
-            out_buf[out_idx..out_idx+3].copy_from_slice(&tag_buf[tag_idx..tag_idx+3]);
+            out_buf[out_idx..out_idx + 3].copy_from_slice(&tag_buf[tag_idx..tag_idx + 3]);
 
             // if keyed, then send_enc and send_mac, otherwise send_clr
             out_idx += if is_keyed {
                 // send the three bytes of tag data encrypted
                 //println!("SEND_ENC:\n\tPT: {:02x?}", &out_buf[out_idx..out_idx+3]);
-                strobe.send_enc(&mut out_buf[out_idx..out_idx+3], false);
+                strobe.send_enc(&mut out_buf[out_idx..out_idx + 3], false);
                 //println!("\tCT: {:02x?})", &out_buf[out_idx..out_idx+3]);
                 // send the mac
-                strobe.send_mac(&mut out_buf[out_idx+3..out_idx+19], false);
+                strobe.send_mac(&mut out_buf[out_idx + 3..out_idx + 19], false);
                 //println!("SEND_MAC({:02x?})", &out_buf[out_idx+3..out_idx+19]);
                 19
             } else {
                 // mix the data into the strobe state
                 //println!("AD({:02x?})", &out_buf[out_idx..out_idx+3]);
-                strobe.ad(&out_buf[out_idx..out_idx+3], false);
+                strobe.ad(&out_buf[out_idx..out_idx + 3], false);
                 // send the data in the clear
                 //println!("SEND_CLR({:02x?})", &out_buf[out_idx..out_idx+3]);
-                strobe.send_clr(&out_buf[out_idx..out_idx+3], false);
+                strobe.send_clr(&out_buf[out_idx..out_idx + 3], false);
                 3
             }
         }
@@ -216,16 +215,18 @@ where
         // output
         out_buf: &mut [u8], // buffer to write the data to
         out_offset: usize,  // the offset into the buffer to start writing to
-
     ) -> Result<usize> {
-
         let mut out_idx = out_offset;
 
         // create the tag
         let mut strobe_tag = if is_keyed {
-            TagBuilder::from_tag("strobe.enc.data_recv").build().map_err(|_| ProtocolError::InvalidTag)?
+            TagBuilder::from_tag("strobe.enc.data_recv")
+                .build()
+                .map_err(|_| ProtocolError::InvalidTag)?
         } else {
-            TagBuilder::from_tag("strobe.clr.data_recv").build().map_err(|_| ProtocolError::InvalidTag)?
+            TagBuilder::from_tag("strobe.clr.data_recv")
+                .build()
+                .map_err(|_| ProtocolError::InvalidTag)?
         };
 
         // the strobe tag len is zero if the in_data len is zero, otherwise
@@ -249,32 +250,36 @@ where
         }
 
         // output the data tag bytes
-        out_idx += Self::strobe_tag_to_message(strobe, is_keyed, in_data.get_tag(), out_buf, out_idx)?;
+        out_idx +=
+            Self::strobe_tag_to_message(strobe, is_keyed, in_data.get_tag(), out_buf, out_idx)?;
 
         // copy the data to the message
         let data_len = in_data.length();
-        out_buf[out_idx..out_idx+data_len].copy_from_slice(&in_data.as_ref()[0..data_len]);
+        out_buf[out_idx..out_idx + data_len].copy_from_slice(&in_data.as_ref()[0..data_len]);
 
         // strobe the data into the message and update out_idx
         out_idx += if is_keyed {
             // send the data encrypted
             //println!("SEND_ENC:\n\tPT: {:02x?}", &out_buf[out_idx..out_idx+data_len]);
-            strobe.send_enc(&mut out_buf[out_idx..out_idx+data_len], false);
+            strobe.send_enc(&mut out_buf[out_idx..out_idx + data_len], false);
             //println!("\tCT: {:02x?}", &out_buf[out_idx..out_idx+data_len]);
             // send the mac
-            strobe.send_mac(&mut out_buf[out_idx+data_len..out_idx+data_len+16], false);
+            strobe.send_mac(
+                &mut out_buf[out_idx + data_len..out_idx + data_len + 16],
+                false,
+            );
             //println!("SEND_MAC({:02x?})", &out_buf[out_idx+data_len..out_idx+data_len+16]);
             data_len + 16
         } else {
             // mix the data into the strobe state
             //println!("AD({:02x?})", &out_buf[out_idx..out_idx+data_len]);
-            strobe.ad(&out_buf[out_idx..out_idx+data_len], false);
+            strobe.ad(&out_buf[out_idx..out_idx + data_len], false);
             // send the data in the clear
             //println!("SEND_CLR({:02x?})", &out_buf[out_idx..out_idx+data_len]);
-            strobe.send_clr(&out_buf[out_idx..out_idx+data_len], false);
+            strobe.send_clr(&out_buf[out_idx..out_idx + data_len], false);
             data_len
         };
-       
+
         // return just the number of bytes we wrote
         Ok(out_idx - out_offset)
     }
@@ -286,14 +291,13 @@ where
         in_offset: usize,
         tag: &mut Tag,
     ) -> Result<usize> {
-
         let mut in_idx = in_offset;
         let mut tag_len = 0;
         let mut tag_buf = [0u8; 9];
         let mut mac_buf = [0u8; 16];
         for tag_idx in (0..9).step_by(3) {
             // copy the 3 bytes of the tag
-            tag_buf[tag_idx..tag_idx+3].copy_from_slice(&in_buf[in_idx..in_idx+3]);
+            tag_buf[tag_idx..tag_idx + 3].copy_from_slice(&in_buf[in_idx..in_idx + 3]);
 
             // read three tag bytes
             in_idx += 3;
@@ -302,20 +306,22 @@ where
             in_idx += if is_keyed {
                 // recv and decrypt the three bytes of encrypted tag data
                 //println!("RECV_ENC:\n\tCT: {:02x?}", &tag_buf[tag_idx..tag_idx+3]);
-                strobe.recv_enc(&mut tag_buf[tag_idx..tag_idx+3], false);
+                strobe.recv_enc(&mut tag_buf[tag_idx..tag_idx + 3], false);
                 //println!("\tPT: {:02x?}", &tag_buf[tag_idx..tag_idx+3]);
                 // check the mac
                 //println!("RECV_MAC({:02x?})", &in_buf[in_idx..in_idx+16]);
-                mac_buf.copy_from_slice(&in_buf[in_idx..in_idx+16]);
-                strobe.recv_mac(&mut mac_buf).map_err(|_| ProtocolError::InvalidMac)?;
+                mac_buf.copy_from_slice(&in_buf[in_idx..in_idx + 16]);
+                strobe
+                    .recv_mac(&mut mac_buf)
+                    .map_err(|_| ProtocolError::InvalidMac)?;
                 16
             } else {
                 // mix the first 3 bytes into the strobe state
                 //println!("AD({:02x?})", &tag_buf[tag_idx..tag_idx+3]);
-                strobe.ad(&tag_buf[tag_idx..tag_idx+3], false);
+                strobe.ad(&tag_buf[tag_idx..tag_idx + 3], false);
                 // recv the data in the clear
                 //println!("RECV_CLR({:02x?})", &tag_buf[tag_idx..tag_idx+3]);
-                strobe.recv_clr(&tag_buf[tag_idx..tag_idx+3], false);
+                strobe.recv_clr(&tag_buf[tag_idx..tag_idx + 3], false);
                 0
             };
 
@@ -323,7 +329,7 @@ where
             tag_len += 3;
 
             // does the tag have another 3 bytes?
-            if tag_buf[tag_idx+2] & 0x80 == 0u8 {
+            if tag_buf[tag_idx + 2] & 0x80 == 0u8 {
                 // we just processed the last 3 bytes of the tag so exit the for loop
                 break;
             }
@@ -331,7 +337,8 @@ where
 
         // create the tag from the tag bytes
         *tag = TagBuilder::from_bytes(&tag_buf[0..tag_len])
-            .build().map_err(|_| ProtocolError::InvalidTag)?;
+            .build()
+            .map_err(|_| ProtocolError::InvalidTag)?;
 
         // return just the number of bytes we read
         Ok(in_idx - in_offset)
@@ -342,14 +349,12 @@ where
         is_keyed: bool,
 
         // input
-        in_buf: &[u8],      // buffer to read the message from
-        in_offset: usize,   // offest in the buffer to start reading from
+        in_buf: &[u8],    // buffer to read the message from
+        in_offset: usize, // offest in the buffer to start reading from
 
         // output
         out_data: &mut (impl TaggedData<'a> + ?Sized),
-
     ) -> Result<usize> {
-
         let mut in_idx = in_offset;
 
         // recv the strobe tag
@@ -398,7 +403,7 @@ where
         }
 
         // copy the message data over
-        out_data.as_mut()[0..data_len].copy_from_slice(&in_buf[in_idx..in_idx+data_len]);
+        out_data.as_mut()[0..data_len].copy_from_slice(&in_buf[in_idx..in_idx + data_len]);
         out_data.set_length(data_len)?;
         out_data.set_tag(&data_tag);
 
@@ -414,8 +419,10 @@ where
             //println!("\tPT: {:02x?}", &out_data.as_ref()[0..data_len]);
             // check the mac
             //println!("RECV_MAC({:02x?})", &in_buf[in_idx..in_idx+16]);
-            mac_buf.copy_from_slice(&in_buf[in_idx..in_idx+16]);
-            strobe.recv_mac(&mut mac_buf).map_err(|_| ProtocolError::InvalidMac)?;
+            mac_buf.copy_from_slice(&in_buf[in_idx..in_idx + 16]);
+            strobe
+                .recv_mac(&mut mac_buf)
+                .map_err(|_| ProtocolError::InvalidMac)?;
             16
         } else {
             // mix the data into the strobe state
@@ -430,7 +437,6 @@ where
         // return just the number of bytes we read
         Ok(in_idx - in_offset)
     }
-
 
     // this uses the AD operation to mix the tag and the data bytes into the
     // given strobe state
@@ -456,7 +462,7 @@ where
         strobe: &mut Strobe,
         params: &Params<'a, T>,
         initiator: bool,
-        out_of_order: bool, 
+        out_of_order: bool,
         rs: P,
         re: P,
         psk: S,
@@ -495,14 +501,26 @@ where
     }
 
     /// Send an outgoing message
-    pub fn send_message(&mut self, in_data: &impl TaggedData<'a>, out_buf: &mut [u8]) -> Result<usize> {
+    pub fn send_message(
+        &mut self,
+        in_data: &impl TaggedData<'a>,
+        out_buf: &mut [u8],
+    ) -> Result<usize> {
         match self {
-
             // first time either send/recv has been called so generate ephemeral
             // if needed, transition to handshake state and continue
             Session::Initialized {
-                strobe, params, initiator, out_of_order, ss, sp, ep, es, rs, psk } => {
-
+                strobe,
+                params,
+                initiator,
+                out_of_order,
+                ss,
+                sp,
+                ep,
+                es,
+                rs,
+                psk,
+            } => {
                 // get the handshake pattern
                 let h = HandshakeState::new(params.handshake, *initiator);
 
@@ -514,7 +532,7 @@ where
                 } else {
                     (ep.clone(), es.clone())
                 };
-              
+
                 // transition to the Handshake state
                 *self = Session::Handshake {
                     strobe: strobe.clone(),
@@ -534,15 +552,25 @@ where
 
                 // call send_message recursively now that we're in the Handshake state
                 self.send_message(in_data, out_buf)
-            },
+            }
 
             Session::Handshake {
-                ref mut strobe, params, handshake_state, initiator, out_of_order,
-                ref mut is_keyed, ref mut sp, ref mut ss, ref mut ep, ref mut es,
-                ref mut rs, ref mut re, psk } => {
-
-                use HandshakeOp::*;
+                ref mut strobe,
+                params,
+                handshake_state,
+                initiator,
+                out_of_order,
+                ref mut is_keyed,
+                ref mut sp,
+                ref mut ss,
+                ref mut ep,
+                ref mut es,
+                ref mut rs,
+                ref mut re,
+                psk,
+            } => {
                 use HandshakeData::*;
+                use HandshakeOp::*;
 
                 // this index value tracks where the next write should start in
                 // the out_buf so that multiple handshake commands can be
@@ -554,7 +582,6 @@ where
                 loop {
                     if let Some(pattern) = handshake_state.next() {
                         match pattern {
-
                             // do an AD that mixes the specified data into the
                             // strobe state and set is_keyed accordingly
                             Mix(d, k) => {
@@ -564,10 +591,10 @@ where
                                     Ssec => ss,
                                     Epub => ep,
                                     Esec => es,
-                                    Rs   => rs,
-                                    Re   => re,
-                                    P    => in_data,
-                                    Psk  => psk,
+                                    Rs => rs,
+                                    Re => re,
+                                    P => in_data,
+                                    Psk => psk,
                                 };
 
                                 // mix the data into the strobe state
@@ -575,7 +602,7 @@ where
 
                                 // set is_keyed
                                 *is_keyed = k;
-                            },
+                            }
 
                             // do an ECDH using the specified keys and then
                             // mix it into the strobe state and set is_keyed
@@ -583,16 +610,20 @@ where
                             MixDh(l, r, k) => {
                                 // get the local key as TaggedData
                                 let local: &dyn TaggedData<'a> = match l {
-                                    Ssec => ss, 
+                                    Ssec => ss,
                                     Esec => es,
-                                    _ => { return Err(Error::Protocol(ProtocolError::InvalidKey)); }
+                                    _ => {
+                                        return Err(Error::Protocol(ProtocolError::InvalidKey));
+                                    }
                                 };
 
                                 // get the remote key as TaggedData
                                 let remote: &dyn TaggedData<'a> = match r {
-                                    Rs   => rs,
-                                    Re   => re,
-                                    _ => { return Err(Error::Protocol(ProtocolError::InvalidKey)); }
+                                    Rs => rs,
+                                    Re => re,
+                                    _ => {
+                                        return Err(Error::Protocol(ProtocolError::InvalidKey));
+                                    }
                                 };
 
                                 // make sure we have valid keys
@@ -602,7 +633,10 @@ where
 
                                 // get the ECDH result as TaggedData
                                 //println!("ECDH:\n\tLOCAL SECRET: {:02x?}\n\tREMOTE PUBLIC: {:02x?}", local.as_ref(), remote.as_ref());
-                                let ecdh = params.key_type.ecdh(local, remote).map_err(|_| ProtocolError::InvalidKey)?;
+                                let ecdh = params
+                                    .key_type
+                                    .ecdh(local, remote)
+                                    .map_err(|_| ProtocolError::InvalidKey)?;
                                 //println!("\tSHARED SECRET: {:02x?}\n", ecdh.as_ref());
 
                                 // mix the data into the strobe state
@@ -610,7 +644,7 @@ where
 
                                 // set is_keyed
                                 *is_keyed = k;
-                            },
+                            }
 
                             // send tagged data either using CLR or ENC+MAC
                             // strobe operations depending on the value of
@@ -625,52 +659,80 @@ where
                                     Ssec => ss,
                                     Epub => ep,
                                     Esec => es,
-                                    Rs   => rs,
-                                    Re   => re,
-                                    P    => in_data,
-                                    Psk  => { return Err(Error::Protocol(ProtocolError::SendingPsk)); }
+                                    Rs => rs,
+                                    Re => re,
+                                    P => in_data,
+                                    Psk => {
+                                        return Err(Error::Protocol(ProtocolError::SendingPsk));
+                                    }
                                 };
 
                                 // mix and send data to the out_data
-                                out_idx += Self::strobe_to_message(strobe, *is_keyed, data, out_buf, out_idx)?;
-                            },
+                                out_idx += Self::strobe_to_message(
+                                    strobe, *is_keyed, data, out_buf, out_idx,
+                                )?;
+                            }
 
                             // we're sending a message, any RecvData commands
                             // are invalid
-                            RecvData(_) => { return Err(Error::Protocol(ProtocolError::InvalidState)); },
+                            RecvData(_) => {
+                                return Err(Error::Protocol(ProtocolError::InvalidState));
+                            }
 
                             // the current sequence of handshake operations is
                             // done so stop here and return the data
-                            Stop => { return Ok(out_idx); },
+                            Stop => {
+                                return Ok(out_idx);
+                            }
 
                             // the handshake process has completed and it is
                             // time to transition into the transport state
                             Split => {
-                                *self = Self::split(strobe, params, *initiator, *out_of_order, rs.clone(), re.clone(), psk.clone());
+                                *self = Self::split(
+                                    strobe,
+                                    params,
+                                    *initiator,
+                                    *out_of_order,
+                                    rs.clone(),
+                                    re.clone(),
+                                    psk.clone(),
+                                );
                                 return Ok(out_idx);
-                            },
+                            }
                         }
                     } else {
                         return Err(Error::Protocol(ProtocolError::InvalidState));
                     }
                 }
-            },
-
-            Session::Transport { ref mut strobe_out, .. } => {
-                Self::strobe_to_message(strobe_out, true, in_data, out_buf, 0)
             }
+
+            Session::Transport {
+                ref mut strobe_out, ..
+            } => Self::strobe_to_message(strobe_out, true, in_data, out_buf, 0),
         }
     }
 
     /// Read the incoming message
-    pub fn recv_message(&mut self, in_buf: &[u8], out_data: &mut impl TaggedData<'a>) -> Result<usize> {
+    pub fn recv_message(
+        &mut self,
+        in_buf: &[u8],
+        out_data: &mut impl TaggedData<'a>,
+    ) -> Result<usize> {
         match self {
-
             // first time either send/recv has been called so generate ephemeral
             // if needed, transition to handshake state and continue
             Session::Initialized {
-                strobe, params, initiator, out_of_order, ss, sp, ep, es, rs, psk } => {
-
+                strobe,
+                params,
+                initiator,
+                out_of_order,
+                ss,
+                sp,
+                ep,
+                es,
+                rs,
+                psk,
+            } => {
                 // get the handshake pattern
                 let h = HandshakeState::new(params.handshake, *initiator);
 
@@ -682,7 +744,7 @@ where
                 } else {
                     (ep.clone(), es.clone())
                 };
-              
+
                 // transition to the Handshake state
                 *self = Session::Handshake {
                     strobe: strobe.clone(),
@@ -702,15 +764,25 @@ where
 
                 // call recv_message recursively now that we're in the Handshake state
                 self.recv_message(in_buf, out_data)
-            },
+            }
 
             Session::Handshake {
-                ref mut strobe, params, handshake_state, initiator, out_of_order,
-                ref mut is_keyed, ref mut sp, ref mut ss, ref mut ep, ref mut es,
-                ref mut rs, ref mut re, psk } => {
-
-                use HandshakeOp::*;
+                ref mut strobe,
+                params,
+                handshake_state,
+                initiator,
+                out_of_order,
+                ref mut is_keyed,
+                ref mut sp,
+                ref mut ss,
+                ref mut ep,
+                ref mut es,
+                ref mut rs,
+                ref mut re,
+                psk,
+            } => {
                 use HandshakeData::*;
+                use HandshakeOp::*;
 
                 // this index value tracks where the next read should start
                 // in the in_buf so that we can process multiple handshake
@@ -722,7 +794,6 @@ where
                 loop {
                     if let Some(pattern) = handshake_state.next() {
                         match pattern {
-
                             // do an AD that mixes the specified data into the
                             // strobe state and set is_keyed accordingly
                             Mix(d, k) => {
@@ -732,10 +803,10 @@ where
                                     Ssec => ss,
                                     Epub => ep,
                                     Esec => es,
-                                    Rs   => rs,
-                                    Re   => re,
-                                    P    => out_data,
-                                    Psk  => psk,
+                                    Rs => rs,
+                                    Re => re,
+                                    P => out_data,
+                                    Psk => psk,
                                 };
 
                                 // mix the data into the strobe state
@@ -743,7 +814,7 @@ where
 
                                 // set is_keyed
                                 *is_keyed = k;
-                            },
+                            }
 
                             // do an ECDH using the specified keys and then
                             // mix it into the strobe state and set is_keyed
@@ -751,16 +822,20 @@ where
                             MixDh(l, r, k) => {
                                 // get the local key as TaggedData
                                 let local: &dyn TaggedData<'a> = match l {
-                                    Ssec => ss, 
+                                    Ssec => ss,
                                     Esec => es,
-                                    _ => { return Err(Error::Protocol(ProtocolError::InvalidKey)); }
+                                    _ => {
+                                        return Err(Error::Protocol(ProtocolError::InvalidKey));
+                                    }
                                 };
 
                                 // get the remote key as TaggedData
                                 let remote: &dyn TaggedData<'a> = match r {
-                                    Rs   => rs,
-                                    Re   => re,
-                                    _ => { return Err(Error::Protocol(ProtocolError::InvalidKey)); }
+                                    Rs => rs,
+                                    Re => re,
+                                    _ => {
+                                        return Err(Error::Protocol(ProtocolError::InvalidKey));
+                                    }
                                 };
 
                                 // make sure we have valid keys
@@ -770,7 +845,10 @@ where
 
                                 // get the ECDH result as TaggedData
                                 //println!("ECDH:\n\tLOCAL SECRET: {:02x?}\n\tREMOTE PUBLIC: {:02x?}", local.as_ref(), remote.as_ref());
-                                let ecdh = params.key_type.ecdh(local, remote).map_err(|_| ProtocolError::InvalidKey)?;
+                                let ecdh = params
+                                    .key_type
+                                    .ecdh(local, remote)
+                                    .map_err(|_| ProtocolError::InvalidKey)?;
                                 //println!("\tSHARED SECRET: {:02x?}\n", ecdh.as_ref());
 
                                 // mix the data into the strobe state
@@ -778,11 +856,13 @@ where
 
                                 // set is_keyed
                                 *is_keyed = k;
-                            },
+                            }
 
                             // we're receiving data so any SendData commands are
                             // invalid
-                            SendData(_) => { return Err(Error::Protocol(ProtocolError::InvalidState)); },
+                            SendData(_) => {
+                                return Err(Error::Protocol(ProtocolError::InvalidState));
+                            }
 
                             // receive tagged data either using CLR or ENC+MAC
                             // strobe operatios depending on the value of
@@ -797,36 +877,50 @@ where
                                     Ssec => ss,
                                     Epub => ep,
                                     Esec => es,
-                                    Rs   => rs,
-                                    Re   => re,
-                                    P    => out_data,
-                                    Psk  => { return Err(Error::Protocol(ProtocolError::ReceivingPsk)); }
+                                    Rs => rs,
+                                    Re => re,
+                                    P => out_data,
+                                    Psk => {
+                                        return Err(Error::Protocol(ProtocolError::ReceivingPsk));
+                                    }
                                 };
 
                                 // read the CDE tag and data from the message buffer
-                                in_idx += Self::strobe_from_message(strobe, *is_keyed, in_buf, in_idx, data)?;
-                            },
+                                in_idx += Self::strobe_from_message(
+                                    strobe, *is_keyed, in_buf, in_idx, data,
+                                )?;
+                            }
 
                             // the current sequence of handshake operations is
                             // done so stop here and return the data
-                            Stop => { return Ok(in_idx); },
+                            Stop => {
+                                return Ok(in_idx);
+                            }
 
                             // the handshake process has completed and it is
                             // time to transition into the transport state
                             Split => {
-                                *self = Self::split(strobe, params, *initiator, *out_of_order, rs.clone(), re.clone(), psk.clone());
+                                *self = Self::split(
+                                    strobe,
+                                    params,
+                                    *initiator,
+                                    *out_of_order,
+                                    rs.clone(),
+                                    re.clone(),
+                                    psk.clone(),
+                                );
                                 return Ok(in_idx);
-                            },
+                            }
                         }
                     } else {
                         return Err(Error::Protocol(ProtocolError::InvalidState));
                     }
                 }
-            },
-
-            Session::Transport { ref mut strobe_in, .. } => {
-                Self::strobe_from_message(strobe_in, true, in_buf, 0, out_data)
             }
+
+            Session::Transport {
+                ref mut strobe_in, ..
+            } => Self::strobe_from_message(strobe_in, true, in_buf, 0, out_data),
         }
     }
 
@@ -835,7 +929,7 @@ where
         match self {
             Session::Handshake { re, .. } => Ok(re.clone()),
             Session::Transport { ref re, .. } => Ok(re.clone()),
-            _ => { Err(Error::Protocol(ProtocolError::InvalidState)) }
+            _ => Err(Error::Protocol(ProtocolError::InvalidState)),
         }
     }
 
@@ -844,7 +938,7 @@ where
         match self {
             Session::Handshake { rs, .. } => Ok(rs.clone()),
             Session::Transport { rs, .. } => Ok(rs.clone()),
-            _ => { Err(Error::Protocol(ProtocolError::InvalidState)) }
+            _ => Err(Error::Protocol(ProtocolError::InvalidState)),
         }
     }
 
@@ -860,7 +954,7 @@ where
     pub fn is_transport(&self) -> bool {
         match self {
             Session::Transport { .. } => true,
-            _ => false
+            _ => false,
         }
     }
 

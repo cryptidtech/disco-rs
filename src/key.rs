@@ -1,8 +1,5 @@
-use core::{
-    fmt::Display,
-    str::FromStr
-};
 use crate::error::Error;
+use core::{fmt::Display, str::FromStr};
 use rand_core::{CryptoRng, RngCore};
 
 /// Trait that all CDE tagged data must impl, the super traits are for
@@ -10,7 +7,7 @@ use rand_core::{CryptoRng, RngCore};
 pub trait TaggedData<'a>: AsRef<[u8]> + AsMut<[u8]> {
     /// Gets the tag
     fn get_tag(&self) -> &cde::Tag;
-    /// Sets the tag from bytes
+    /// Sets the tag
     fn set_tag(&mut self, tag: &cde::Tag);
     /// Tells if the data is all zeroes
     fn is_zero(&self) -> bool;
@@ -20,7 +17,7 @@ pub trait TaggedData<'a>: AsRef<[u8]> + AsMut<[u8]> {
     fn max_length(&self) -> usize;
     /// Returns the length of the data contained, 0 if is_zero() == true
     fn length(&self) -> usize;
-    /// Sets the data from bytes
+    /// Sets the data length
     fn set_length(&mut self, len: usize) -> Result<usize, Error>;
 }
 
@@ -46,8 +43,9 @@ pub trait KeyAgreement<'a> {
     type Error;
 
     /// Do the ECDH operation
-    fn ecdh(&self, local: &(impl TaggedData<'a> + ?Sized),
-        remote: &(impl TaggedData<'a> + ?Sized)) -> Result<Self::SharedSecret, Self::Error>;
+    fn ecdh(
+        &self,
+        local: &(impl TaggedData<'a> + ?Sized),
+        remote: &(impl TaggedData<'a> + ?Sized),
+    ) -> Result<Self::SharedSecret, Self::Error>;
 }
-
-

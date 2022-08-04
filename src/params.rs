@@ -1,11 +1,11 @@
+use crate::{
+    error::{Error, ParamError},
+    key::{KeyAgreement, KeyGenerator, KeyType},
+};
 use core::{
     fmt::{Display, Error as FmtError, Formatter},
     marker::PhantomData,
     str::FromStr,
-};
-use crate::{
-    error::{Error, ParamError},
-    key::{KeyAgreement, KeyGenerator, KeyType},
 };
 use semver::{Version, VersionReq};
 use strobe_rs::STROBE_VERSION;
@@ -14,7 +14,7 @@ use strobe_rs::STROBE_VERSION;
 #[derive(PartialEq, Clone, Debug)]
 pub struct Params<'a, T>
 where
-    T: KeyType + KeyGenerator<'a> + KeyAgreement<'a> + Clone
+    T: KeyType + KeyGenerator<'a> + KeyAgreement<'a> + Clone,
 {
     /// The protocol name
     pub protocol: Protocol,
@@ -28,9 +28,9 @@ where
     _pd: PhantomData<&'a ()>,
 }
 
-impl<'a, T> FromStr for Params<'a, T> 
+impl<'a, T> FromStr for Params<'a, T>
 where
-    T: KeyType + KeyGenerator<'a> + KeyAgreement<'a> + Clone
+    T: KeyType + KeyGenerator<'a> + KeyAgreement<'a> + Clone,
 {
     type Err = Error;
 
@@ -39,7 +39,11 @@ where
         Ok(Params {
             protocol: split.next().ok_or(ParamError::TooFewParameters)?.parse()?,
             handshake: split.next().ok_or(ParamError::TooFewParameters)?.parse()?,
-            key_type: split.next().ok_or(ParamError::TooFewParameters)?.parse().map_err(|_| ParamError::InvalidKeyType)?,
+            key_type: split
+                .next()
+                .ok_or(ParamError::TooFewParameters)?
+                .parse()
+                .map_err(|_| ParamError::InvalidKeyType)?,
             version: split.next().ok_or(ParamError::TooFewParameters)?.parse()?,
             _pd: PhantomData,
         })
@@ -48,10 +52,14 @@ where
 
 impl<'a, T> Display for Params<'a, T>
 where
-    T: KeyType + KeyGenerator<'a> + KeyAgreement<'a> + Clone
+    T: KeyType + KeyGenerator<'a> + KeyAgreement<'a> + Clone,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
-        write!(f, "{}_{}_{}_{}", self.protocol, self.handshake, self.key_type, self.version)
+        write!(
+            f,
+            "{}_{}_{}_{}",
+            self.protocol, self.handshake, self.key_type, self.version
+        )
     }
 }
 
@@ -70,7 +78,7 @@ impl FromStr for Protocol {
         use self::Protocol::*;
         match s {
             "Noise" => Ok(Noise),
-            _ => Err(Error::Param(ParamError::InvalidProtocol))
+            _ => Err(Error::Param(ParamError::InvalidProtocol)),
         }
     }
 }
@@ -129,7 +137,6 @@ pub struct HandshakeState {
 
 /// HandshakeState impl
 impl HandshakeState {
-
     /// construct a new handshake state from a list of operations
     pub fn new(pattern: Handshake, initiator: bool) -> Self {
         HandshakeState {
@@ -143,7 +150,7 @@ impl HandshakeState {
 /// Make it easy walk through the steps of the state machine
 impl Iterator for HandshakeState {
     type Item = HandshakeOp;
-    
+
     fn next(&mut self) -> Option<Self::Item> {
         let pattern = self.handshake.get_pattern(self.initiator);
         if self.index < pattern.len() {
@@ -173,6 +180,8 @@ pub enum Handshake {
     XX,
     /// Initiator transmits their static public key immediately
     IK,
+    /// Initiator transmits their ephemeral and static public key immediately
+    IX,
     /// No static key for the initiator, reponder key known
     NK,
     /// No static key for the initiator, responder transmits key
@@ -186,15 +195,19 @@ pub enum Handshake {
 }
 
 impl Handshake {
-
     /// Return the appropriate HandshakeState
     pub fn get_pattern(&self, initiator: bool) -> &[HandshakeOp] {
-        use HandshakeOp::*;
         use HandshakeData::*;
+        use HandshakeOp::*;
 
         match self {
             // N_Strobe Session Setup
             // ========================
+            // NOTE: This is the equivalent to libsodium's sealed boxes. This session type is
+            // designed to anonymously send messages to a recipient given their public key. Only
+            // the recipient can decrypt these messages using their private key. While the
+            // recipient can verify the integrity of the message, they cannot verify the identity
+            // of the sender.
             //
             // Initiator                            Responder
             //
@@ -229,7 +242,8 @@ impl Handshake {
             //                                      | Split()
             Handshake::N => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         Mix(Rs, false),
                         SendData(Epub),
                         MixDh(Esec, Rs, true),
@@ -237,7 +251,8 @@ impl Handshake {
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         Mix(Spub, false),
                         RecvData(Re),
                         MixDh(Ssec, Re, true),
@@ -245,9 +260,12 @@ impl Handshake {
                         Split,
                     ]
                 }
-            },
+            }
             // K_Strobe Session Setup
             // ========================
+            // NOTE: This session type is the equivalent to libsodium's authenticated encryption.
+            // This variant in particular assumes that the sender and recipient have already
+            // executed a key exchange out-of-band prior to this session's creation.
             //
             // Initiator                            Responder
             //
@@ -287,7 +305,8 @@ impl Handshake {
             //                                      | Split()
             Handshake::K => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         Mix(Spub, false),
                         Mix(Rs, false),
                         SendData(Epub),
@@ -297,7 +316,8 @@ impl Handshake {
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         Mix(Rs, false),
                         Mix(Spub, false),
                         RecvData(Re),
@@ -307,9 +327,13 @@ impl Handshake {
                         Split,
                     ]
                 }
-            },
+            }
             // X_Strobe Session Setup
             // ========================
+            // NOTE: This session type is the equivalent to libsodium's authenticated encryption.
+            // This particular session does not require the sender and recipient to have exchanged
+            // keys prior to the session. Only the sender needs to know the recipient's public key
+            // because the sender ends their's in the message, encrypted.
             //
             // Initiator                            Responder
             //
@@ -350,7 +374,8 @@ impl Handshake {
             //                                      | Split()
             Handshake::X => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         Mix(Rs, false),
                         SendData(Epub),
                         MixDh(Esec, Rs, true),
@@ -360,7 +385,8 @@ impl Handshake {
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         Mix(Spub, false),
                         RecvData(Re),
                         MixDh(Ssec, Re, true),
@@ -370,7 +396,7 @@ impl Handshake {
                         Split,
                     ]
                 }
-            },
+            }
             // NN_Strobe Session Setup
             // =======================
             //
@@ -386,7 +412,7 @@ impl Handshake {
             // | MixHash(e.pub)
             // | SendAndHash(payload)
             // | MixHash(payload)
-            // 
+            //
             //                      -> e, (payload)
             //
             //                                      +-- recv_message()
@@ -415,29 +441,31 @@ impl Handshake {
             //
             Handshake::NN => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         SendData(Epub),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         RecvData(P),
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         RecvData(Re),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         SendData(P),
                         Split,
                     ]
                 }
-            },
+            }
             // KK_Strobe Session Setup
             // ========================
             //
@@ -497,7 +525,8 @@ impl Handshake {
             // | Split()
             Handshake::KK => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         Mix(Spub, false),
                         Mix(Rs, false),
                         SendData(Epub),
@@ -505,7 +534,7 @@ impl Handshake {
                         MixDh(Ssec, Rs, true),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         MixDh(Esec, Rs, true),
@@ -513,7 +542,8 @@ impl Handshake {
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         Mix(Rs, false),
                         Mix(Spub, false),
                         RecvData(Re),
@@ -521,7 +551,7 @@ impl Handshake {
                         MixDh(Ssec, Rs, true),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         MixDh(Ssec, Re, true),
@@ -529,7 +559,7 @@ impl Handshake {
                         Split,
                     ]
                 }
-            },
+            }
             // XX_Strobe Session Setup
             // =======================
             //
@@ -546,7 +576,7 @@ impl Handshake {
             // | MixHash(e.pub)
             // | SendAndHash(payload)
             // | MixHash(payload)
-            // 
+            //
             //                      -> e, (payload)
             //
             //                                      +-- recv_message()
@@ -576,7 +606,7 @@ impl Handshake {
             // | MixKeyAndHash(DH(e.sec, rs))
             // | payload = RecvAndHash()
             // | MixHash(payload)
-            // 
+            //
             // +-- send_message()
             // | SendAndHash(s.pub)
             // | MixHash(s.pub)
@@ -596,43 +626,45 @@ impl Handshake {
             //                                      | Split()
             Handshake::XX => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         SendData(Epub),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         RecvData(Rs),
                         MixDh(Esec, Rs, true),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Spub),
                         MixDh(Ssec, Rs, true),
                         SendData(P),
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         RecvData(Re),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         SendData(Spub),
                         MixDh(Ssec, Re, true),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Rs),
                         MixDh(Ssec, Rs, true),
                         RecvData(P),
                         Split,
                     ]
                 }
-            },
+            }
             // IK_Strobe Session Setup
             // =======================
             //
@@ -657,7 +689,7 @@ impl Handshake {
             // | MixKeyAndHash(DH(s.sec, rs))
             // | SendAndHash(payload)
             // | MixHash(payload)
-            // 
+            //
             //                      -> e, es, s, ss, (payload)
             //
             //                                      +-- recv_message()
@@ -693,7 +725,8 @@ impl Handshake {
             //
             Handshake::IK => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         Mix(Rs, false),
                         SendData(Epub),
                         MixDh(Esec, Rs, true),
@@ -701,7 +734,7 @@ impl Handshake {
                         MixDh(Ssec, Rs, true),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         MixDh(Esec, Rs, true),
@@ -709,7 +742,8 @@ impl Handshake {
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         Mix(Spub, false),
                         RecvData(Re),
                         MixDh(Ssec, Re, true),
@@ -717,7 +751,7 @@ impl Handshake {
                         MixDh(Ssec, Rs, true),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         MixDh(Ssec, Re, true),
@@ -725,7 +759,97 @@ impl Handshake {
                         Split,
                     ]
                 }
-            },
+            }
+            // IX_Strobe Session Setup
+            // =======================
+            //
+            // Initiator                            Responder
+            //
+            // +-- init()                           +-- init()
+            // | InitSymmetric("Noise_IX...")       | InitSymmetric("Noise_IX...")
+            // | e = gen_key()                      | e = gen_key()
+            // | s = load_key()                     | s = load_key()
+            // | re, rs = NULL                      | re, rs = NULL
+            //
+            // +-- send_message()
+            // | SendAndHash(e.pub)
+            // | MixHash(e.pub)
+            // | SendAndHash(s.pub)
+            // | MexHash(e.pub)
+            // | SendAndHash(payload)
+            // | MixHash(payload)
+            //
+            //                      -> e, s, (payload)
+            //
+            //                                      +-- recv_message()
+            //                                      | re = RecvAndHash()
+            //                                      | MixHash(re)
+            //                                      | rs = RecvAndHash()
+            //                                      | MixHash(rs)
+            //                                      | payload = RecvAndHash()
+            //                                      | MixHash(payload)
+            //
+            //                                      +-- send_message()
+            //                                      | SendAndHash(e.pub)
+            //                                      | MixHash(e.pub)
+            //                                      | MixKeyAndHash(DH(e.sec, re))
+            //                                      | MixKeyAndHash(DH(e.sec, rs))
+            //                                      | SendAndHash(s.pub)
+            //                                      | MixHash(s.pub)
+            //                                      | MixKeyAndHash(DH(s.sec, re))
+            //                                      | SendAndHash(payload)
+            //                                      | MixHash(payload)
+            //                                      | Split()
+            //
+            //                      <- e, ee, se, s, es, (payload)
+            //
+            // +-- recv_message()
+            // | re = RecvAndHash()
+            // | MixHash(re)
+            // | MixKeyAndHash(DH(e.sec, re))
+            // | MixKeyAndHash(DH(s.sec, re))
+            // | rs = RecvAndHash()
+            // | MixHash(rs)
+            // | MixKeyAndHash(DH(e.sec, rs))
+            // | payload = RecvAndHash()
+            // | MixHash(payload)
+            // | Split()
+            //
+            Handshake::IX => {
+                if initiator {
+                    &[
+                        /* send */
+                        SendData(Epub),
+                        SendData(Spub),
+                        SendData(P),
+                        Stop,
+                        /* recv */
+                        RecvData(Re),
+                        MixDh(Esec, Re, true),
+                        MixDh(Ssec, Re, true),
+                        RecvData(Rs),
+                        MixDh(Esec, Rs, true),
+                        RecvData(P),
+                        Split,
+                    ]
+                } else {
+                    &[
+                        /* recv */
+                        RecvData(Re),
+                        RecvData(Rs),
+                        RecvData(P),
+                        Stop,
+                        /* send */
+                        SendData(Epub),
+                        MixDh(Esec, Re, true),
+                        MixDh(Esec, Rs, true),
+                        SendData(Spub),
+                        MixDh(Ssec, Re, true),
+                        SendData(P),
+                        Split,
+                    ]
+                }
+            }
             // NK_Strobe Session Setup
             // =======================
             //
@@ -748,7 +872,7 @@ impl Handshake {
             // | MixKey(DH(e.sec, rs))
             // | SendAndHash(payload)
             // | MixHash(payload)
-            // 
+            //
             //                      -> e, es, (payload)
             //
             //                                      +-- recv_message()
@@ -779,33 +903,35 @@ impl Handshake {
             //
             Handshake::NK => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         Mix(Rs, false),
                         SendData(Epub),
                         MixDh(Esec, Rs, true),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         RecvData(P),
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         Mix(Spub, false),
                         RecvData(Re),
                         MixDh(Ssec, Re, true),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         SendData(P),
                         Split,
                     ]
                 }
-            },
+            }
             // NX_Strobe Session Setup
             // =======================
             //
@@ -822,7 +948,7 @@ impl Handshake {
             // | MixHash(e.pub)
             // | SendAndHash(payload)
             // | MixHash(payload)
-            // 
+            //
             //                      -> e, (payload)
             //
             //                                      +-- recv_message()
@@ -857,11 +983,12 @@ impl Handshake {
             //
             Handshake::NX => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         SendData(Epub),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         RecvData(Rs),
@@ -870,11 +997,12 @@ impl Handshake {
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         RecvData(Re),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         SendData(Spub),
@@ -883,7 +1011,7 @@ impl Handshake {
                         Split,
                     ]
                 }
-            },
+            }
             // XK1_Strobe Session Setup
             // ========================
             //
@@ -953,43 +1081,45 @@ impl Handshake {
             //
             Handshake::XK1 => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         Mix(Rs, false),
                         SendData(Epub),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         MixDh(Esec, Rs, true),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Spub),
                         MixDh(Ssec, Re, true),
                         SendData(P),
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         Mix(Spub, false),
                         RecvData(Re),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         MixDh(Ssec, Re, true),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Rs),
                         MixDh(Esec, Rs, true),
                         RecvData(P),
                         Split,
                     ]
                 }
-            },
+            }
             // KK1_Strobe Session Setup
             // ========================
             //
@@ -1048,13 +1178,14 @@ impl Handshake {
             //
             Handshake::KK1 => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         Mix(Spub, false),
                         Mix(Rs, false),
                         SendData(Epub),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Re),
                         MixDh(Esec, Re, true),
                         MixDh(Esec, Rs, true),
@@ -1063,13 +1194,14 @@ impl Handshake {
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         Mix(Rs, false),
                         Mix(Spub, false),
                         RecvData(Re),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Epub),
                         MixDh(Esec, Re, true),
                         MixDh(Ssec, Re, true),
@@ -1078,7 +1210,7 @@ impl Handshake {
                         Split,
                     ]
                 }
-            },
+            }
             // NNpsk2_Strobe Session Setup
             // =======================
             //
@@ -1095,7 +1227,7 @@ impl Handshake {
             // | MixHash(e.pub)
             // | SendAndHash(payload)
             // | MixHash(payload)
-            // 
+            //
             //                      -> e, (payload)
             //
             //                                      +-- recv_message()
@@ -1126,11 +1258,12 @@ impl Handshake {
             //
             Handshake::NNpsk2 => {
                 if initiator {
-                    &[/* send */
+                    &[
+                        /* send */
                         SendData(Epub),
                         SendData(P),
                         Stop,
-                      /* recv */
+                        /* recv */
                         RecvData(Re),
                         MixDh(Esec, Re, false),
                         Mix(Psk, true),
@@ -1138,11 +1271,12 @@ impl Handshake {
                         Split,
                     ]
                 } else {
-                    &[/* recv */
+                    &[
+                        /* recv */
                         RecvData(Re),
                         RecvData(P),
                         Stop,
-                      /* send */
+                        /* send */
                         SendData(Epub),
                         MixDh(Esec, Re, false),
                         Mix(Psk, true),
@@ -1150,44 +1284,43 @@ impl Handshake {
                         Split,
                     ]
                 }
-            },
-
+            }
         }
     }
 
-    /// True if handshake pattern requires local secret key
+    /// True if handshake pattern requires local static key
     pub fn needs_local_secret_key(&self, initiator: bool) -> bool {
         use Handshake::*;
         if initiator {
             match self {
                 N | NN | NK | NX | NNpsk2 => false,
-                K | X | KK | XX | IK | XK1 | KK1 => true,
+                K | X | KK | XX | IK | IX | XK1 | KK1 => true,
             }
         } else {
             match self {
                 N | NN | NNpsk2 => false,
-                K | X | KK | XX | IK | NK | NX | XK1 | KK1 => true,
+                K | X | KK | XX | IK | IX | NK | NX | XK1 | KK1 => true,
             }
         }
     }
 
-    /// True if handshake pattern requires remote public key
+    /// True if handshake pattern requires remote static public key before the handshake
     pub fn needs_remote_public_key(&self, initiator: bool) -> bool {
         use Handshake::*;
         if initiator {
             match self {
                 N | K | X | KK | IK | NK | XK1 | KK1 => true,
-                NN | XX | NX | NNpsk2 => false,
+                IX | NN | XX | NX | NNpsk2 => false,
             }
         } else {
             match self {
                 K | KK | KK1 => true,
-                N | X | NN | XX | IK | NK | NX | XK1 | NNpsk2 => false,
+                N | X | NN | XX | IK | IX | NK | NX | XK1 | NNpsk2 => false,
             }
         }
     }
 
-    /// True if the handshake pattern requires a pre-shared key
+    /// True if the handshake pattern requires a pre-shared key before the handshake
     pub fn needs_pre_shared_key(&self, _initiator: bool) -> bool {
         if *self == Handshake::NNpsk2 {
             true
@@ -1203,7 +1336,7 @@ impl Handshake {
             false
         } else {
             match self {
-                N | K | X | NN | KK | XX | IK | NK | NX | NNpsk2 => false,
+                N | K | X | NN | KK | XX | IK | IX | NK | NX | NNpsk2 => false,
                 XK1 | KK1 => true,
             }
         }
@@ -1214,7 +1347,7 @@ impl Handshake {
         use Handshake::*;
         if initiator {
             match self {
-                N | K | X | NN | KK | XX | IK | NK | NX | NNpsk2 => false,
+                N | K | X | NN | KK | XX | IK | IX | NK | NX | NNpsk2 => false,
                 XK1 | KK1 => true,
             }
         } else {
@@ -1229,19 +1362,20 @@ impl FromStr for Handshake {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         use self::Handshake::*;
         match s {
-            "N"   => Ok(N),
-            "K"   => Ok(K),
-            "X"   => Ok(X),
-            "NN"  => Ok(NN),
-            "KK"  => Ok(KK),
-            "XX"  => Ok(XX),
-            "IK"  => Ok(IK),
-            "NK"  => Ok(NK),
-            "NX"  => Ok(NX),
+            "N" => Ok(N),
+            "K" => Ok(K),
+            "X" => Ok(X),
+            "NN" => Ok(NN),
+            "KK" => Ok(KK),
+            "XX" => Ok(XX),
+            "IK" => Ok(IK),
+            "IX" => Ok(IX),
+            "NK" => Ok(NK),
+            "NX" => Ok(NX),
             "XK1" => Ok(XK1),
             "KK1" => Ok(KK1),
             "NNpsk2" => Ok(NNpsk2),
-            _ => Err(Error::Param(ParamError::InvalidHandshake))
+            _ => Err(Error::Param(ParamError::InvalidHandshake)),
         }
     }
 }
@@ -1250,15 +1384,16 @@ impl Display for Handshake {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         use self::Handshake::*;
         match self {
-            N   => write!(f, "N"),
-            K   => write!(f, "K"),
-            X   => write!(f, "X"),
-            NN  => write!(f, "NN"),
-            KK  => write!(f, "KK"),
-            XX  => write!(f, "XX"),
-            IK  => write!(f, "IK"),
-            NK  => write!(f, "NK"),
-            NX  => write!(f, "NX"),
+            N => write!(f, "N"),
+            K => write!(f, "K"),
+            X => write!(f, "X"),
+            NN => write!(f, "NN"),
+            KK => write!(f, "KK"),
+            XX => write!(f, "XX"),
+            IK => write!(f, "IK"),
+            IX => write!(f, "IX"),
+            NK => write!(f, "NK"),
+            NX => write!(f, "NX"),
             XK1 => write!(f, "XK1"),
             KK1 => write!(f, "KK1"),
             NNpsk2 => write!(f, "NNpsk2"),
@@ -1280,18 +1415,19 @@ impl FromStr for StrobeVersion {
         // this should be the string "STROBE"
         let strobe = split.next().ok_or(ParamError::InvalidStrobeVersion)?;
         match strobe {
-            "STROBE" => {},
-            _ => return Err(Error::Param(ParamError::InvalidStrobeVersion))
+            "STROBE" => {}
+            _ => return Err(Error::Param(ParamError::InvalidStrobeVersion)),
         }
 
         // this should be a string like "1.0.2"
         let vstr = split.next().ok_or(ParamError::InvalidStrobeVersion)?;
 
         // we are expecting a version =1.0.2
-        let req = VersionReq::parse(format!("={}", STROBE_VERSION).as_str()).map_err(|_| { ParamError::InvalidStrobeVersion })?;
+        let req = VersionReq::parse(format!("={}", STROBE_VERSION).as_str())
+            .map_err(|_| ParamError::InvalidStrobeVersion)?;
 
         // parse the version string
-        let ver = Version::parse(vstr).map_err(|_| { ParamError::InvalidStrobeVersion })?;
+        let ver = Version::parse(vstr).map_err(|_| ParamError::InvalidStrobeVersion)?;
 
         // check that the version string matches the version requirement
         if req.matches(&ver) {

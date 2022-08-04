@@ -1,7 +1,5 @@
-use disco_rs::{
-    key::{KeyAgreement, KeyGenerator},
-};
 use disco_ecdh_example::key::soft::AsymKeyType;
+use disco_rs::key::{KeyAgreement, KeyGenerator};
 
 #[allow(dead_code)]
 mod inner;
@@ -9,7 +7,6 @@ use inner::get_rng;
 
 #[test]
 fn test_x25518_dh() {
-
     // Initiator generates ephemeral key and test static key
     let x25519 = AsymKeyType::X25519;
     let (i_e_pub, i_e_sec) = x25519.generate(get_rng());
@@ -61,7 +58,6 @@ fn test_x25518_dh() {
 
 #[test]
 fn test_k256_dh() {
-
     // Initiator generates ephemeral key and test static key
     let k256 = AsymKeyType::K256;
     let (i_e_pub, i_e_sec) = k256.generate(get_rng());
@@ -113,7 +109,6 @@ fn test_k256_dh() {
 
 #[test]
 fn test_p256_dh() {
-
     // Initiator generates ephemeral key and test static key
     let p256 = AsymKeyType::P256;
     let (i_e_pub, i_e_sec) = p256.generate(get_rng());
@@ -188,7 +183,8 @@ fn gen_x25519() {
     let (s_pub, s_sec) = x25519.generate(get_rng());
 
     println!("(");
-    println!("    /* static public */");
+    println!("    /* static public */
+");
     println!("    TaggedSliceBuilder::new(\"key.x25519.public\", 32).from_bytes(&[");
     print_key(s_pub.as_ref());
     println!("    ]).build().unwrap(),");
@@ -209,7 +205,7 @@ fn gen_x25519() {
 
 #[test]
 fn gen_k256() {
-    // Initiator generates ephemeral key and test static key
+// Initiator generates ephemeral key and test static key
     let k256 = AsymKeyType::K256;
     let (e_pub, e_sec) = k256.generate(get_rng());
     let (s_pub, s_sec) = k256.generate(get_rng());
@@ -236,7 +232,7 @@ fn gen_k256() {
 
 #[test]
 fn gen_p256() {
-    // Initiator generates ephemeral key and test static key
+// Initiator generates ephemeral key and test static key
     let p256 = AsymKeyType::P256;
     let (e_pub, e_sec) = p256.generate(get_rng());
     let (s_pub, s_sec) = p256.generate(get_rng());
@@ -261,4 +257,3 @@ fn gen_p256() {
     println!(")");
 }
 */
-
