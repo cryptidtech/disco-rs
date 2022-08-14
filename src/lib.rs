@@ -1,4 +1,5 @@
 //!
+#![feature(trait_alias)]
 #![warn(missing_docs)]
 #![deny(
     trivial_casts,
@@ -16,16 +17,24 @@ extern crate alloc;
 #[macro_use]
 extern crate std;
 
-/// Disco key traits
-pub mod key;
-/// Disco params
-pub mod params;
-/// Disco session
-pub mod session;
 /// Disco session builder
 pub mod builder;
 /// Disco errors
 pub mod error;
+/// Disco handshake
+pub mod handshake;
+/// Disco key traits
+pub mod key;
+/// Disco nonce traits
+pub mod nonce;
+/// Disco params
+pub mod params;
+/// Disco session
+pub mod session;
+/// Disco tag trait
+pub mod tag;
+/// Disco transport
+pub mod transport;
 
 /// the Result type for all operations
 pub type Result<T> = anyhow::Result<T, error::Error>;

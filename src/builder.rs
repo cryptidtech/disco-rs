@@ -1,21 +1,33 @@
 use crate::{
-    error::{Error, BuilderError},
-    key::{KeyType, KeyGenerator, KeyAgreement, TaggedData},
+    error::{BuilderError, Error},
+    handshake::HandshakeState,
+    key::{KeyAgreement, KeyGenerator, KeyType},
+    nonce::NonceGenerator,
     params::Params,
     session::Session,
+    tag::{Tag, TaggedData},
 };
-use strobe_rs::{Strobe, SecParam};
+use core::marker::PhantomData;
+use strobe_rs::{SecParam, Strobe};
 
 /// Generates a [`HandshakeState`] and also validates that all of the
 /// prerequisites for the given parameters are satisfied.
-pub struct Builder<'a, T, P, S>
+pub struct Builder<'a, K, NG, T, N, P, S, SS>
 where
-    T: KeyType + KeyGenerator<'a, PublicKey = P, SecretKey = S> + KeyAgreement<'a> + Clone,
-    P: TaggedData<'a> + Clone + Default,
-    S: TaggedData<'a> + Clone + Default,
+    K: KeyType + KeyGenerator<'a, T, P, S> + KeyAgreement<'a, T, P, S, SS> + Clone,
+    NG: NonceGenerator<'a, T, N> + Clone,
+    T: Tag + Clone + Default,
+    N: TaggedData<'a, T> + Clone + Default,
+    P: TaggedData<'a, T> + Default + Clone,
+    S: TaggedData<'a, T> + Default + Clone,
+    SS: TaggedData<'a, T> + Default + Clone,
 {
     /// Disco params
-    params: Params<'a, T>,
+    params: Params<'a, K, T, N, P, S, SS>,
+    /// Nonce generator
+    nonces: NG,
+    /// Protocol prologue
+    prologue: &'a [u8],
     /// Local static secret key
     local_static_secret_key: S,
     /// Local static public key
@@ -27,30 +39,47 @@ where
     /// Remote ephemeral public key
     remote_static_public_key: P,
     /// Pre-shared key
-    pre_shared_key: S,
-    /// Out of order delivery 
+    pre_shared_key: SS,
+    /// Out of order delivery
     out_of_order: bool,
+    /// Re-key threshold
+    rekey_in: u64,
+    // phantom marker
+    _t: PhantomData<&'a T>,
 }
 
-impl<'a, T, P, S> Builder<'a, T, P, S>
+impl<'a, K, NG, T, N, P, S, SS> Builder<'a, K, NG, T, N, P, S, SS>
 where
-    T: KeyType + KeyGenerator<'a, PublicKey = P, SecretKey = S> + KeyAgreement<'a> + Clone,
-    P: TaggedData<'a> + Clone + Default,
-    S: TaggedData<'a> + Clone + Default,
+    K: KeyType + KeyGenerator<'a, T, P, S> + KeyAgreement<'a, T, P, S, SS> + Clone,
+    NG: NonceGenerator<'a, T, N> + Clone,
+    T: Tag + Clone + Default,
+    N: TaggedData<'a, T> + Clone + Default,
+    P: TaggedData<'a, T> + Default + Clone,
+    S: TaggedData<'a, T> + Default + Clone,
+    SS: TaggedData<'a, T> + Default + Clone,
 {
-
     /// Construct a new builder from DiscoParams
-    pub fn new(params: &Params<'a, T>) -> Self {
+    pub fn new(params: &Params<'a, K, T, N, P, S, SS>, nonces: &NG) -> Self {
         Builder {
             params: params.clone(),
+            nonces: nonces.clone(),
+            prologue: &[],
             local_static_secret_key: S::default(),
             local_static_public_key: P::default(),
             local_ephemeral_secret_key: S::default(),
             local_ephemeral_public_key: P::default(),
             remote_static_public_key: P::default(),
-            pre_shared_key: S::default(),
+            pre_shared_key: SS::default(),
             out_of_order: false,
+            rekey_in: u64::max_value() - 1,
+            _t: PhantomData,
         }
+    }
+
+    /// Add prologue byte sequence that both parties want to confirm is identical
+    pub fn with_prologue(mut self, data: &'a [u8]) -> Self {
+        self.prologue = data;
+        self
     }
 
     /// Add a local static secret key
@@ -84,7 +113,7 @@ where
     }
 
     /// Add a pre-shared key
-    pub fn pre_shared_key(mut self, key: &S) -> Self {
+    pub fn pre_shared_key(mut self, key: &SS) -> Self {
         self.pre_shared_key = key.clone();
         self
     }
@@ -95,41 +124,68 @@ where
         self
     }
 
+    /// Set the number of messages to send before re-key occurs
+    pub fn rekey_in(mut self, num: u64) -> Self {
+        self.rekey_in = num;
+        self
+    }
+
     /// Build an initiator disco session
-    pub fn build_initiator(self) -> Result<Session<'a, T, P, S>, Error> {
+    pub fn build_initiator(self) -> Result<Session<'a, K, NG, T, N, P, S, SS>, Error> {
         self.build(true)
     }
 
     /// Build a responder disco session
-    pub fn build_responder(self) -> Result<Session<'a, T, P, S>, Error> {
+    pub fn build_responder(self) -> Result<Session<'a, K, NG, T, N, P, S, SS>, Error> {
         self.build(false)
     }
 
     /// Construct the disco session
-    pub fn build(self, initiator: bool) -> Result<Session<'a, T, P, S>, Error> {
-        if self.local_static_secret_key.is_zero() && self.params.handshake.needs_local_secret_key(initiator) {
+    pub fn build(self, initiator: bool) -> Result<Session<'a, K, NG, T, N, P, S, SS>, Error> {
+        if self.local_static_secret_key.get_tag().get_data_length() == 0
+            && self.params.handshake.needs_local_static_key(initiator)
+        {
             return Err(Error::Builder(BuilderError::MissingLocalSecretKey));
         }
 
-        if self.remote_static_public_key.is_zero() && self.params.handshake.needs_remote_public_key(initiator) {
+        if self.remote_static_public_key.get_tag().get_data_length() == 0
+            && self.params.handshake.needs_remote_static_key(initiator)
+        {
             return Err(Error::Builder(BuilderError::MissingRemotePublicKey));
         }
 
-        if self.pre_shared_key.is_zero() && self.params.handshake.needs_pre_shared_key(initiator) {
+        if self.pre_shared_key.get_tag().get_data_length() == 0
+            && self.params.handshake.needs_pre_shared_key(initiator)
+        {
             return Err(Error::Builder(BuilderError::MissingPreSharedKey));
         }
 
-        Ok(Session::Initialized {
-            strobe: Strobe::new(format!("{}", self.params).as_bytes(), SecParam::B256),
+        // §5.3.1 InitializeSymmetric(protocol_name)
+        let strobe = Strobe::new(format!("{}", self.params).as_bytes(), SecParam::B256);
+
+        // create our handshake state
+        let hs = HandshakeState::new(self.params.handshake, initiator);
+
+        Ok(Session::Handshake {
+            strobe,
             params: self.params,
-            initiator: initiator,
+            nonces: self.nonces,
+            handshake_state: hs,
+            initiator,
             out_of_order: self.out_of_order,
+            rekey_in: self.rekey_in,
+            msgs_since_rekey: 0,
+            msgs_total: 0,
+            is_keyed: false,
+            prologue: self.prologue,
             sp: self.local_static_public_key,
             ss: self.local_static_secret_key,
             ep: self.local_ephemeral_public_key,
             es: self.local_ephemeral_secret_key,
             rs: self.remote_static_public_key,
+            re: P::default(),
             psk: self.pre_shared_key,
+            prf: [0u8; 32],
         })
     }
 }

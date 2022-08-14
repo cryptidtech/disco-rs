@@ -12,6 +12,9 @@ pub enum Error {
     /// A protocol error occurred
     #[error("protocol error")]
     Protocol(#[from] ProtocolError),
+    /// A tag related error occurred
+    #[error("tag error")]
+    Tag(#[from] TagError),
 }
 
 /// Errors that can happen from invalid protocol strings
@@ -49,8 +52,8 @@ pub enum BuilderError {
     /// Missing pre-shared key
     #[error("missing pre-shared key needed for this handshake pattern")]
     MissingPreSharedKey,
-    /// Invalid CDE tag
-    #[error("invalid CDE tag")]
+    /// Invalid tag
+    #[error("invalid tag")]
     InvalidTag,
     /// Missing buffer
     #[error("missing bytes")]
@@ -84,4 +87,39 @@ pub enum ProtocolError {
     /// Receiving a pre-shared key is a protocol error
     #[error("receiving pre-shared key error")]
     ReceivingPsk,
+    /// Invalid handshake operaion
+    #[error("invalid handshake operaion")]
+    InvalidHandshakeOp,
+    /// Sending the prologue is a protocol error
+    #[error("sending prologue error")]
+    SendingPrologue,
+    /// Receiving the prologue is a protocol error
+    #[error("receiving prologue error")]
+    ReceivingPrologue,
+    /// Shared secret calculation error
+    #[error("error calculating shared secret")]
+    SharedSecretCalculationFailed,
+    /// Message limit reached
+    #[error("message limit reached, repeat handshake")]
+    MessageLimitReached,
+    /// Invalid nonce encountered
+    #[error("invalid nonce")]
+    InvalidNonce,
+    /// Sending the PRF is a protocol error
+    #[error("sending prf error")]
+    SendingPrf,
+    /// Receiving the PRF is a protocol error
+    #[error("receiving prf error")]
+    ReceivingPrf,
+    /// An invalid op in the transport state
+    #[error("invalid transport op")]
+    InvalidTransportOp,
+}
+
+/// Errors related to tag parsing
+#[derive(Error, PartialEq, Copy, Clone, Debug)]
+pub enum TagError {
+    /// Parse error
+    #[error("tag parse error")]
+    ParseError,
 }

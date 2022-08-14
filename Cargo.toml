@@ -1,6 +1,6 @@
 [package]
 name = "disco-rs"
-version = "0.3.0"
+version = "0.4.0"
 authors = ["Dave Huseby <dave@cryptid.tech>"]
 description = "A no-std, pure Rust impl of Disco Noise Protocol extension"
 documentation = "https://docs.rs/disco-rs"
@@ -37,7 +37,7 @@ no-std = [
 
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
-cde = { version = "0.3.1", default-features = false }
+cde = { version = "0.3", default-features = false }
 rand_core = "0.6"
 rand_core5 = { version = "0.5", package = "rand_core" }
 rand = { version = "0.8", default-features = false, optional = true }
@@ -47,3 +47,13 @@ semver = { version = "1.0", default-features = false }
 serde = { version = "1.0", default-features = false, features = ["serde_derive"] }
 strobe-rs = { version = "0.7", default-features = false, features = ["serde"] }
 thiserror = { version = "1.0", default-features = false }
+zeroize = "1.4"
+
+[dev-dependencies]
+cde = { version = "0.3" }
+elliptic-curve = { version = "0.10", features = ["ecdh"] }
+rand = "0.8"
+rand7 = { version = "0.7", package = "rand" }
+rand_xorshift = "0.3"
+serde_bare = "0.5"
+x25519-dalek = { version = "1.1" }
