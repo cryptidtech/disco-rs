@@ -10,10 +10,10 @@ use.
 This implementation is notable in that it supports some of the [Advanced
 Features](http://noiseprotocol.org/noise.html#advanced-features) listed
 in §11 of the Noise specification. Specifically, this crate supports
-channel binding and out-of-order transport messages. The main difficulty
-with out-of-order transport messages is tracking which
-nonces you have seen to defend against replay attacks. For small numbers
-of messages in a session, this is trivial, but long-lived sessions with
+channel binding, re-key, and out-of-order transport messages. The main
+difficulty with out-of-order transport messages is tracking which nonces
+you have seen to defend against replay attacks. For small numbers of
+messages in a session, this is trivial, but long-lived sessions with
 many millions or billions of messages make tracking nonces extremely
 difficult. The example implementation in the `test` folder uses a
 simplistic sliding window approach to tracking nonces for demonstration
@@ -26,21 +26,23 @@ in `src/tag.rs`: `Tag` and `TaggedData`, `src/key.rs`: `KeyType`,
 `KeyGenerator`, and `KeyAgreement`, and in `src/nonce.rs`:
 `NonceGenerator`. That said, for the impatient among you, the `tests`
 folder has an example impl and tests of these traits using the common
-`x25519_dalek` crate. It's not difficult to plug your own favorite
-cryptography library in, but it is also not trivial. If you don't have a
+`x25519_dalek` crate. It's not difficult to plug in your favorite
+cryptography library, but it is also not trivial. If you don't have a
 very good understanding of Noise and Disco, they you should probably
 look elsewhere.
 
 ## Handshakes
 
-This crate supports all of the handshake patterns listed in the Disco
-extension documentation: N, K, X, Npsk0, Kpsk0, Xpsk1, NN, KK, XX, IK,
-IX, NK, NX, XK1, KK1, and NNpsk2. You can always add your own favorite
-handshake to the crate by editing `src/params.rs` to include it. That
-file is well documented and I think it is easy to figure out how to
-define a new handshake using the existing code. Please be sure to add
-tests for any new handshakes in either `tests/one_way.rs` or
-`tests/two_way.rs` depending on which handshake you add.
+This crate supports all of the handshake patterns listed in the [Disco
+extension documentation](https://discocrypto.com): N, K, X, KK, XX, IK,
+NK, NX, and NNpsk2. It also supports a number of other handshake
+patterns that are often useful: Npsk0, Kpsk0, Xpsk1, NN, IX,XK1, and
+KK1. You can always add your own favorite handshake to the crate by
+editing `src/params.rs` to include it. That file is well documented and
+I think it is easy to figure out how to define a new handshake using the
+existing code. Please be sure to add tests for any new handshakes in
+either `tests/one_way.rs` or `tests/two_way.rs` depending on which
+handshake you add.
 
 ## Feedback
 

@@ -13,93 +13,142 @@ mod two_way {
 
         mod without_prologue {
             use super::{super::*, O};
-            const P: Option<&[u8]> = None;
+            const P: &'static [u8] = b"";
+            const R: u64 = u64::max_value() - 1;
 
             #[test]
             fn nn() {
-                do_nn(O, P);
+                do_nn(O, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P);
+                do_kk(O, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P);
+                do_xx(O, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P);
+                do_ik(O, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P);
+                do_ix(O, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P);
+                do_nk(O, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P);
+                do_nx(O, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P);
+                do_xk1(O, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P);
+                do_kk1(O, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P);
+                do_nnpsk2(O, P, R);
             }
         }
 
         mod with_prologue {
             use super::{super::*, O};
-            const P: Option<&[u8]> = Some(b"the prologue");
+            const P: &'static [u8] = b"the prologue";
+            const R: u64 = u64::max_value() - 1;
 
             #[test]
             fn nn() {
-                do_nn(O, P);
+                do_nn(O, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P);
+                do_kk(O, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P);
+                do_xx(O, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P);
+                do_ik(O, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P);
+                do_ix(O, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P);
+                do_nk(O, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P);
+                do_nx(O, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P);
+                do_xk1(O, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P);
+                do_kk1(O, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P);
+                do_nnpsk2(O, P, R);
+            }
+        }
+
+        mod with_rekey {
+            use super::{super::*, O};
+            const P: &'static [u8] = b"the prologue";
+            const R: u64 = 2; // rekey every 2 msgs
+
+            #[test]
+            fn nn() {
+                do_nn(O, P, R);
+            }
+            #[test]
+            fn kk() {
+                do_kk(O, P, R);
+            }
+            #[test]
+            fn xx() {
+                do_xx(O, P, R);
+            }
+            #[test]
+            fn ik() {
+                do_ik(O, P, R);
+            }
+            #[test]
+            fn ix() {
+                do_ix(O, P, R);
+            }
+            #[test]
+            fn nk() {
+                do_nk(O, P, R);
+            }
+            #[test]
+            fn nx() {
+                do_nx(O, P, R);
+            }
+            #[test]
+            fn xk1() {
+                do_xk1(O, P, R);
+            }
+            #[test]
+            fn kk1() {
+                do_kk1(O, P, R);
+            }
+            #[test]
+            fn nnpsk2() {
+                do_nnpsk2(O, P, R);
             }
         }
     }
@@ -109,98 +158,147 @@ mod two_way {
 
         mod without_prologue {
             use super::{super::*, O};
-            const P: Option<&[u8]> = None;
+            const P: &'static [u8] = b"";
+            const R: u64 = u64::max_value() - 1;
 
             #[test]
             fn nn() {
-                do_nn(O, P);
+                do_nn(O, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P);
+                do_kk(O, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P);
+                do_xx(O, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P);
+                do_ik(O, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P);
+                do_ix(O, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P);
+                do_nk(O, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P);
+                do_nx(O, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P);
+                do_xk1(O, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P);
+                do_kk1(O, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P);
+                do_nnpsk2(O, P, R);
             }
         }
 
         mod with_prologue {
             use super::{super::*, O};
-            const P: Option<&[u8]> = Some(b"the prologue");
+            const P: &'static [u8] = b"the prologue";
+            const R: u64 = u64::max_value() - 1;
 
             #[test]
             fn nn() {
-                do_nn(O, P);
+                do_nn(O, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P);
+                do_kk(O, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P);
+                do_xx(O, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P);
+                do_ik(O, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P);
+                do_ix(O, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P);
+                do_nk(O, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P);
+                do_nx(O, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P);
+                do_xk1(O, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P);
+                do_kk1(O, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P);
+                do_nnpsk2(O, P, R);
+            }
+        }
+
+        mod with_rekey {
+            use super::{super::*, O};
+            const P: &'static [u8] = b"the prologue";
+            const R: u64 = 2; // rekey every 2 msgs
+
+            #[test]
+            fn nn() {
+                do_nn(O, P, R);
+            }
+            #[test]
+            fn kk() {
+                do_kk(O, P, R);
+            }
+            #[test]
+            fn xx() {
+                do_xx(O, P, R);
+            }
+            #[test]
+            fn ik() {
+                do_ik(O, P, R);
+            }
+            #[test]
+            fn ix() {
+                do_ix(O, P, R);
+            }
+            #[test]
+            fn nk() {
+                do_nk(O, P, R);
+            }
+            #[test]
+            fn nx() {
+                do_nx(O, P, R);
+            }
+            #[test]
+            fn xk1() {
+                do_xk1(O, P, R);
+            }
+            #[test]
+            fn kk1() {
+                do_kk1(O, P, R);
+            }
+            #[test]
+            fn nnpsk2() {
+                do_nnpsk2(O, P, R);
             }
         }
     }
 
-    fn do_nn(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_nn(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // create the params with the correct protocol string
         let params = DiscoParams::from_str("Noise_NN_25519_STROBEv1.0.2").unwrap();
 
@@ -210,30 +308,20 @@ mod two_way {
         // -> e, ee
 
         // the initiator does not have a static key pair
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
         // the responder does not have a static key pair
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
@@ -241,7 +329,7 @@ mod two_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_kk(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_kk(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -258,45 +346,29 @@ mod two_way {
         // -> e, es, ss
         // <- e, ee, se
 
-        // the initiator has a static key pair and receives the responder's static public key
+        // the initiator has a static key pair and receives the responder&'s static public key
         // before initiating the handshake.
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .remote_static_public_key(&r.sp)
+            .local_static_public_key(&i.sp)
+            .local_static_secret_key(&i.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
-        // the responder has a static key pair and receives the initiator's static public key
+        // the responder has a static key pair and receives the initiator&'s static public key
         // before initiating the handshake.
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&i.sp)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&i.sp)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .remote_static_public_key(&i.sp)
+            .local_static_public_key(&r.sp)
+            .local_static_secret_key(&r.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
@@ -304,7 +376,7 @@ mod two_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_xx(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_xx(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -321,40 +393,26 @@ mod two_way {
 
         // the initiator has a static key pair and sends their static public key in the first
         // message after encryption begins.
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .local_static_public_key(&i.sp)
+            .local_static_secret_key(&i.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
         // the responder has a static key pair and sends their static public key to the initiator in
-        // the first encrypted respond and receives the initiator's static public key in the second
+        // the first encrypted respond and receives the initiator&'s static public key in the second
         // message from them.
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .local_static_public_key(&r.sp)
+            .local_static_secret_key(&r.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
@@ -362,7 +420,7 @@ mod two_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_ik(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_ik(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -378,43 +436,28 @@ mod two_way {
         // -> e, es, s, ss
         // <- e, ee, se
 
-        // the initiator has a static key pair and receives the responder's static public key
+        // the initiator has a static key pair and receives the responder&'s static public key
         // before initiating the handshake.
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .remote_static_public_key(&r.sp)
+            .local_static_public_key(&i.sp)
+            .local_static_secret_key(&i.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
-        // the responder has a static key pair and receives the initiator's static public key
+        // the responder has a static key pair and receives the initiator&'s static public key
         // during the handshake.
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .local_static_public_key(&r.sp)
+            .local_static_secret_key(&r.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
@@ -422,7 +465,7 @@ mod two_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_ix(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_ix(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -438,39 +481,25 @@ mod two_way {
 
         // the initiator has a static key pair and sends their static public key in the first
         // message before encryption starts
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .local_static_public_key(&i.sp)
+            .local_static_secret_key(&i.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
         // the responder has a static key pair and sends their static public key to the initiator
         // in the first response after encryption begins.
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .local_static_public_key(&r.sp)
+            .local_static_secret_key(&r.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
@@ -478,7 +507,7 @@ mod two_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_nk(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_nk(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // get initiator and responder keys
         let r = DiscoKeys::r_keys();
 
@@ -493,38 +522,25 @@ mod two_way {
         // -> e, es
         // <- e, ee
 
-        // the initiator does not have a static key pair but receives the responder's static public
+        // the initiator does not have a static key pair but receives the responder&'s static public
         // key before handshaking begins.
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .remote_static_public_key(&r.sp)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
         // the responder has a static key pair
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .local_static_public_key(&r.sp)
+            .local_static_secret_key(&r.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
@@ -532,7 +548,7 @@ mod two_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_nx(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_nx(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // get initiator and responder keys
         let r = DiscoKeys::r_keys();
 
@@ -545,39 +561,26 @@ mod two_way {
         // -> e, es
         // <- e, ee, s, es
 
-        // the initiator does not have a static key pair and receives the responder's static public
+        // the initiator does not have a static key pair and receives the responder&'s static public
         // key in the first response after encryption has begun.
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .remote_static_public_key(&r.sp)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
         // the responder has a static key pair and transmits it in the first response after
         // encryption has begun.
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .local_static_public_key(&r.sp)
+            .local_static_secret_key(&r.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
@@ -585,7 +588,7 @@ mod two_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_xk1(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_xk1(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -602,45 +605,30 @@ mod two_way {
         // <- e, ee, es
         // -> s, se
 
-        // the initiator has a static key pair, receives the responder's static public key before
+        // the initiator has a static key pair, receives the responder&'s static public key before
         // handshaking and transmits its static public key in the second message after encryption
         // has begun.
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .remote_static_public_key(&r.sp)
+            .local_static_public_key(&i.sp)
+            .local_static_secret_key(&i.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
         // the responder has a static key pair and sends their static public key to the initiator
         // before the handshaking and receives the their static public key in the second message
         // after encryption has begun.
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .local_static_public_key(&r.sp)
+            .local_static_secret_key(&r.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
@@ -648,7 +636,7 @@ mod two_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_kk1(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_kk1(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -666,42 +654,26 @@ mod two_way {
         // <- e, ee, se, es
 
         // the initiator has a static key pair and both sides exchange them before the handshake.
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&r.sp)
-                .local_static_public_key(&i.sp)
-                .local_static_secret_key(&i.ss)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .remote_static_public_key(&r.sp)
+            .local_static_public_key(&i.sp)
+            .local_static_secret_key(&i.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
         // the responder has a static key pair and both sides exchange them before the handshake.
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&i.sp)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .remote_static_public_key(&i.sp)
-                .local_static_public_key(&r.sp)
-                .local_static_secret_key(&r.ss)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .remote_static_public_key(&i.sp)
+            .local_static_public_key(&r.sp)
+            .local_static_secret_key(&r.ss)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
@@ -709,7 +681,7 @@ mod two_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_nnpsk2(ooo: bool, prologue: Option<&'static [u8]>) {
+    fn do_nnpsk2(ooo: bool, prologue: &'static [u8], rekey: u64) {
         // create the params with the correct protocol string
         let params = DiscoParams::from_str("Noise_NNpsk2_25519_STROBEv1.0.2").unwrap();
 
@@ -723,34 +695,22 @@ mod two_way {
         // <- e, ee, psk
 
         // the initiator does not have a static key pair
-        let mut initiator = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .pre_shared_key(&psk)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .pre_shared_key(&psk)
-                .out_of_order(ooo)
-                .build_initiator()
-                .expect("failed to build initiator session"),
-        };
+        let mut initiator = DiscoBuilder::new(&params, &nonces)
+            .pre_shared_key(&psk)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_initiator()
+            .expect("failed to build initiator session");
 
         // the responder does not have a static key pair
-        let mut responder = match prologue {
-            Some(p) => DiscoBuilder::new(&params, &nonces)
-                .pre_shared_key(&psk)
-                .out_of_order(ooo)
-                .with_prologue(p)
-                .build_responder()
-                .expect("failed to build responder session"),
-            None => DiscoBuilder::new(&params, &nonces)
-                .pre_shared_key(&psk)
-                .out_of_order(ooo)
-                .build_responder()
-                .expect("failed to build responder session"),
-        };
+        let mut responder = DiscoBuilder::new(&params, &nonces)
+            .pre_shared_key(&psk)
+            .out_of_order(ooo)
+            .with_prologue(prologue)
+            .rekey_in(rekey)
+            .build_responder()
+            .expect("failed to build responder session");
 
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());

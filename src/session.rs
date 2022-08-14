@@ -139,18 +139,18 @@ where
         // if keyed then meta_send_enc otherwise meta_send_clr
         if is_keyed {
             // send the three bytes of tag data encrypted
-            println!(
-                "SEND_META_ENC:\n\tPT: {:02x?}",
-                &out_buf[out_offset..out_offset + tag_len]
-            );
+            //println!(
+            //    "SEND_META_ENC:\n\tPT: {:02x?}",
+            //    &out_buf[out_offset..out_offset + tag_len]
+            //);
             strobe.meta_send_enc(&mut out_buf[out_offset..out_offset + tag_len], false);
-            println!("\tCT: {:02x?})", &out_buf[out_offset..out_offset + tag_len]);
+            //println!("\tCT: {:02x?})", &out_buf[out_offset..out_offset + tag_len]);
         } else {
             // send the data in the clear
-            println!(
-                "SEND_META_CLR({:02x?})",
-                &out_buf[out_offset..out_offset + tag_len]
-            );
+            //println!(
+            //    "SEND_META_CLR({:02x?})",
+            //    &out_buf[out_offset..out_offset + tag_len]
+            //);
             strobe.meta_send_clr(&out_buf[out_offset..out_offset + tag_len], false);
         }
 
@@ -178,25 +178,25 @@ where
         // if keyed, the send_enc and send_mac, otherwise send_clr
         out_idx += if is_keyed {
             // send the data encrypted
-            println!(
-                "SEND_ENC:\n\tPT: {:02x?}",
-                &out_buf[out_idx..out_idx + data_len]
-            );
+            //println!(
+            //    "SEND_ENC:\n\tPT: {:02x?}",
+            //    &out_buf[out_idx..out_idx + data_len]
+            //);
             strobe.send_enc(&mut out_buf[out_idx..out_idx + data_len], false);
-            println!("\tCT: {:02x?}", &out_buf[out_idx..out_idx + data_len]);
+            //println!("\tCT: {:02x?}", &out_buf[out_idx..out_idx + data_len]);
             // send the mac
             strobe.send_mac(
                 &mut out_buf[out_idx + data_len..out_idx + data_len + 16],
                 false,
             );
-            println!(
-                "SEND_MAC({:02x?})",
-                &out_buf[out_idx + data_len..out_idx + data_len + 16]
-            );
+            //println!(
+            //    "SEND_MAC({:02x?})",
+            //    &out_buf[out_idx + data_len..out_idx + data_len + 16]
+            //);
             data_len + 16
         } else {
             // send the data in the clear
-            println!("SEND_CLR({:02x?})", &out_buf[out_idx..out_idx + data_len]);
+            //println!("SEND_CLR({:02x?})", &out_buf[out_idx..out_idx + data_len]);
             strobe.send_clr(&out_buf[out_idx..out_idx + data_len], false);
             data_len
         };
@@ -257,12 +257,12 @@ where
 
             // try to parse the tag from the bytes received so far...
             if tag.try_parse(in_idx) {
-                if is_keyed {
-                    println!("RECV_META_ENC:\n\tCT: {:02x?}", &debug_buf[..in_idx]);
-                    println!("\tPT: {:02x?}", &tag.as_mut()[..in_idx]);
-                } else {
-                    println!("RECV_META_CLR({:02x?})", &tag.as_ref()[..in_idx]);
-                }
+                //if is_keyed {
+                //    println!("RECV_META_ENC:\n\tCT: {:02x?}", &debug_buf[..in_idx]);
+                //    println!("\tPT: {:02x?}", &tag.as_mut()[..in_idx]);
+                //} else {
+                //    println!("RECV_META_CLR({:02x?})", &tag.as_ref()[..in_idx]);
+                //}
                 return Ok(in_idx);
             }
         }
@@ -301,14 +301,14 @@ where
         let mut mac_buf = [0u8; 16];
         in_idx += if is_keyed {
             // recv and decrypt the data
-            println!("RECV_ENC:\n\tCT: {:02x?}", &out_buf[..data_len]);
+            //println!("RECV_ENC:\n\tCT: {:02x?}", &out_buf[..data_len]);
             strobe.recv_enc(&mut out_buf[..data_len], false);
-            println!("\tPT: {:02x?}", &out_buf[..data_len]);
+            //println!("\tPT: {:02x?}", &out_buf[..data_len]);
             // check the mac
-            println!(
-                "RECV_MAC({:02x?})",
-                &in_buf[in_idx + data_len..in_idx + data_len + 16]
-            );
+            //println!(
+            //    "RECV_MAC({:02x?})",
+            //    &in_buf[in_idx + data_len..in_idx + data_len + 16]
+            //);
             mac_buf.copy_from_slice(&in_buf[in_idx + data_len..in_idx + data_len + 16]);
             strobe
                 .recv_mac(&mut mac_buf)
@@ -316,7 +316,7 @@ where
             data_len + 16
         } else {
             // recv the data in the clear
-            println!("RECV_CLR({:02x?})", &out_buf[..data_len]);
+            //println!("RECV_CLR({:02x?})", &out_buf[..data_len]);
             strobe.recv_clr(&out_buf[..data_len], false);
             data_len
         };
@@ -356,11 +356,15 @@ where
 
         // check if it is time to rekey and rekey the strobe state
         if *since_rekey >= rekey_in {
+            //println!("REKEYING NOW!! AFTER {} MSGS", rekey_in);
             strobe.ratchet(16, false);
 
             if out_of_order {
                 strobe.meta_ratchet(0, false);
             }
+
+            // reset the counter
+            *since_rekey = 0;
         }
 
         // check to see if we've reached the message limits
@@ -626,7 +630,7 @@ where
                                     Epub => ep.as_ref(),
                                     Esec => es.as_ref(),
                                     Payload => {
-                                        println!("READ {} BYTES FROM IN_BUF", in_buf.len());
+                                        //println!("READ {} BYTES FROM IN_BUF", in_buf.len());
                                         in_buf
                                     }
                                     Prologue => {
@@ -764,14 +768,14 @@ where
                                     },
                                     match d {
                                         Payload => {
-                                            println!("READ {} BYTES FROM IN_BUF", in_buf.len());
+                                            //println!("READ {} BYTES FROM IN_BUF", in_buf.len());
                                             in_buf
                                         }
                                         Nonce => {
-                                            println!(
-                                                "READ {} BYTES FROM NONCE",
-                                                nonce.as_ref().len()
-                                            );
+                                            //println!(
+                                            //    "READ {} BYTES FROM NONCE",
+                                            //    nonce.as_ref().len()
+                                            //);
                                             nonce.as_ref()
                                         }
                                         _ => return Err(ProtocolError::SendingPrf.into()),
@@ -995,7 +999,7 @@ where
                                     Spub => sp.set_tag(&tag),
                                     Ssec => ss.set_tag(&tag),
                                     Payload => {
-                                        println!("WROTE {} BYTES TO OUT_BUF", o);
+                                        //println!("WROTE {} BYTES TO OUT_BUF", o);
                                         out_idx += o;
                                     } // update the out_buf index
                                     _ => {}
@@ -1087,7 +1091,7 @@ where
 
                             // check the nonce value with the nonce generator to ensure it is valid
                             CheckNonce => {
-                                println!("CHECKING NONCE: {:02x?}", nonce.as_ref());
+                                //println!("CHECKING NONCE: {:02x?}", nonce.as_ref());
                                 if !in_nonces.check_add(&nonce) {
                                     return Err(ProtocolError::InvalidNonce.into());
                                 }
@@ -1136,11 +1140,11 @@ where
                                 // set the decoded tag
                                 match d {
                                     Nonce => {
-                                        println!("WROTE {} BYTES TO NONCE", o);
+                                        //println!("WROTE {} BYTES TO NONCE", o);
                                         nonce.set_tag(&tag)
                                     }
                                     Payload => {
-                                        println!("WROTE {} BYTES TO OUTBUF", o);
+                                        //println!("WROTE {} BYTES TO OUTBUF", o);
                                         out_idx += o;
                                     }
                                     _ => {}
