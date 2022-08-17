@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use cde::{CryptoData, Tag as CdeTag, TagBuilder};
 use core::{
-    fmt::{Display, Error as FmtError, Formatter},
+    fmt::{self, Display, Error as FmtError, Formatter},
     marker::PhantomData,
     str::FromStr,
 };
@@ -11,35 +11,35 @@ use disco_rs::{
     key::{KeyAgreement, KeyGenerator, KeyType},
     nonce::NonceGenerator,
     params::Params,
+    prologue::Prologue,
     session::Session,
     tag::{Tag, TaggedData},
 };
 use rand_core::{CryptoRng, RngCore};
+use serde::{
+    de::{self, MapAccess, SeqAccess, Unexpected, Visitor},
+    ser::SerializeStruct,
+    Deserialize, Deserializer, Serialize, Serializer,
+};
+use serde_big_array::BigArray;
 use zeroize::Zeroize;
 
-pub type DiscoParams<'a> = Params<
-    'a,
+pub type DiscoParams =
+    Params<DiscoXeddsa, DiscoTag, DiscoNonce, DiscoPublicKey, DiscoSecretKey, DiscoSharedSecret>;
+pub type DiscoSession = Session<
     DiscoXeddsa,
+    DiscoNonceGenerator,
+    DiscoPrologue,
     DiscoTag,
     DiscoNonce,
     DiscoPublicKey,
     DiscoSecretKey,
     DiscoSharedSecret,
 >;
-pub type DiscoSession<'a> = Session<
-    'a,
+pub type DiscoBuilder = Builder<
     DiscoXeddsa,
     DiscoNonceGenerator,
-    DiscoTag,
-    DiscoNonce,
-    DiscoPublicKey,
-    DiscoSecretKey,
-    DiscoSharedSecret,
->;
-pub type DiscoBuilder<'a> = Builder<
-    'a,
-    DiscoXeddsa,
-    DiscoNonceGenerator,
+    DiscoPrologue,
     DiscoTag,
     DiscoNonce,
     DiscoPublicKey,
@@ -57,6 +57,94 @@ pub struct DiscoTag {
     tag: CdeTag,
     len: usize,
     bytes: [u8; TAG_LEN],
+}
+
+impl Serialize for DiscoTag {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut dt = serializer.serialize_struct("DiscoTag", 2)?;
+        dt.serialize_field("len", &self.len.to_be_bytes())?;
+        dt.serialize_field("bytes", &self.bytes)?;
+        dt.end()
+    }
+}
+
+impl<'de> Deserialize<'de> for DiscoTag {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(field_identifier, rename_all = "lowercase")]
+        enum Field {
+            Len,
+            Bytes,
+        }
+
+        struct DiscoTagVisitor;
+        impl<'de> Visitor<'de> for DiscoTagVisitor {
+            type Value = DiscoTag;
+
+            fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.write_str("struct DiscoTag")
+            }
+
+            fn visit_seq<V>(self, mut seq: V) -> Result<DiscoTag, V::Error>
+            where
+                V: SeqAccess<'de>,
+            {
+                let len_bytes = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
+                let bytes: [u8; TAG_LEN] = seq
+                    .next_element()?
+                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
+                let len = usize::from_be_bytes(len_bytes);
+                if let Ok(tag) = TagBuilder::from_bytes(&bytes[..len]).build() {
+                    Ok(DiscoTag { tag, len, bytes })
+                } else {
+                    Err(de::Error::invalid_type(Unexpected::Seq, &self))
+                }
+            }
+
+            fn visit_map<V>(self, mut map: V) -> Result<DiscoTag, V::Error>
+            where
+                V: MapAccess<'de>,
+            {
+                let mut len_bytes = None;
+                let mut bytes: Option<[u8; TAG_LEN]> = None;
+                while let Some(key) = map.next_key()? {
+                    match key {
+                        Field::Len => {
+                            if len_bytes.is_some() {
+                                return Err(de::Error::duplicate_field("len"));
+                            }
+                            len_bytes = Some(map.next_value()?);
+                        }
+                        Field::Bytes => {
+                            if bytes.is_some() {
+                                return Err(de::Error::duplicate_field("bytes"));
+                            }
+                            bytes = Some(map.next_value()?);
+                        }
+                    }
+                }
+                let len_bytes = len_bytes.ok_or_else(|| de::Error::missing_field("len"))?;
+                let bytes = bytes.ok_or_else(|| de::Error::missing_field("bytes"))?;
+                let len = usize::from_be_bytes(len_bytes);
+                if let Ok(tag) = TagBuilder::from_bytes(&bytes[..len]).build() {
+                    Ok(DiscoTag { tag, len, bytes })
+                } else {
+                    Err(de::Error::invalid_type(Unexpected::Map, &self))
+                }
+            }
+        }
+
+        const FIELDS: &'static [&'static str] = &["len", "bytes"];
+        deserializer.deserialize_struct("DiscoTag", FIELDS, DiscoTagVisitor)
+    }
 }
 
 impl Tag for DiscoTag {
@@ -120,15 +208,21 @@ impl AsMut<[u8]> for DiscoTag {
 }
 
 /// This is the impl for public, secret and shared xeddsa secrets
-#[derive(Clone, Debug, Default, PartialEq, Zeroize)]
-pub struct DiscoKeyData<T> {
+#[derive(Clone, Debug, Default, PartialEq, Zeroize, Serialize, Deserialize)]
+pub struct DiscoKeyData<T>
+where
+    T: Clone + Default,
+{
     tag: DiscoTag,
     buf: [u8; 32],
     _t: PhantomData<T>,
 }
 
 /// impl TaggedData for the public key
-impl<'a, T> TaggedData<'a, DiscoTag> for DiscoKeyData<T> {
+impl<T> TaggedData<DiscoTag> for DiscoKeyData<T>
+where
+    T: Clone + Default,
+{
     /// Get the tag
     fn get_tag(&self) -> &DiscoTag {
         &self.tag
@@ -140,14 +234,20 @@ impl<'a, T> TaggedData<'a, DiscoTag> for DiscoKeyData<T> {
     }
 }
 
-impl<T> AsRef<[u8]> for DiscoKeyData<T> {
+impl<T> AsRef<[u8]> for DiscoKeyData<T>
+where
+    T: Clone + Default,
+{
     // get a reference to the byte array
     fn as_ref(&self) -> &[u8] {
         self.buf.as_ref()
     }
 }
 
-impl<T> AsMut<[u8]> for DiscoKeyData<T> {
+impl<T> AsMut<[u8]> for DiscoKeyData<T>
+where
+    T: Clone + Default,
+{
     // get a mutable reference to the byte array
     fn as_mut(&mut self) -> &mut [u8] {
         self.buf.as_mut()
@@ -156,15 +256,15 @@ impl<T> AsMut<[u8]> for DiscoKeyData<T> {
 
 // create type aliases for easier code reading, this also allows us to have specialized versions of
 // from_bytes for each of these aliases allowing us to create tags with the correct values
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Public {}
 pub type DiscoPublicKey = DiscoKeyData<Public>;
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Secret {}
 pub type DiscoSecretKey = DiscoKeyData<Secret>;
 
-#[derive(Clone, Debug, Default, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 pub struct Shared {}
 pub type DiscoSharedSecret = DiscoKeyData<Shared>;
 
@@ -223,14 +323,14 @@ impl Into<[u8; 32]> for DiscoSharedSecret {
 }
 
 /// KeyType + KeyGenerator + KeyAgreement for xeddsa (x2519) keys
-#[derive(Clone, Debug, Default, PartialEq, Zeroize)]
+#[derive(Clone, Debug, Default, PartialEq, Zeroize, Serialize, Deserialize)]
 pub struct DiscoXeddsa {}
 
 /// This type does impl Display and FromStr so we just need to say it does
 impl KeyType for DiscoXeddsa {}
 
 /// Implement a way to generate key pairs from Xeddsa
-impl<'a> KeyGenerator<'a, DiscoTag, DiscoPublicKey, DiscoSecretKey> for DiscoXeddsa {
+impl KeyGenerator<DiscoTag, DiscoPublicKey, DiscoSecretKey> for DiscoXeddsa {
     /// Generate a new key from a random data source
     fn generate(
         &self,
@@ -248,9 +348,7 @@ impl<'a> KeyGenerator<'a, DiscoTag, DiscoPublicKey, DiscoSecretKey> for DiscoXed
 }
 
 /// Implement doing ecdh for AsymKeyType
-impl<'a> KeyAgreement<'a, DiscoTag, DiscoPublicKey, DiscoSecretKey, DiscoSharedSecret>
-    for DiscoXeddsa
-{
+impl KeyAgreement<DiscoTag, DiscoPublicKey, DiscoSecretKey, DiscoSharedSecret> for DiscoXeddsa {
     type Error = Error;
 
     /// Do the ECDH operation
@@ -292,13 +390,13 @@ impl Display for DiscoXeddsa {
 }
 
 /// Disco nonce value
-#[derive(Clone, Default)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct DiscoNonce {
     tag: DiscoTag,
     buf: [u8; 8], // u64 as 8 little-endian bytes
 }
 
-impl<'a> TaggedData<'a, DiscoTag> for DiscoNonce {
+impl TaggedData<DiscoTag> for DiscoNonce {
     /// Get the tag
     fn get_tag(&self) -> &DiscoTag {
         &self.tag
@@ -310,14 +408,14 @@ impl<'a> TaggedData<'a, DiscoTag> for DiscoNonce {
     }
 }
 
-impl<'a> AsRef<[u8]> for DiscoNonce {
+impl AsRef<[u8]> for DiscoNonce {
     // get a reference to the byte array
     fn as_ref(&self) -> &[u8] {
         &self.buf
     }
 }
 
-impl<'a> AsMut<[u8]> for DiscoNonce {
+impl AsMut<[u8]> for DiscoNonce {
     // get a mutable reference to the byte array
     fn as_mut(&mut self) -> &mut [u8] {
         &mut self.buf
@@ -329,6 +427,41 @@ impl From<&[u8; 8]> for DiscoNonce {
         let mut t = DiscoTag::from("nonce.u64.le");
         t.set_data_length(8);
         Self { tag: t, buf: *b }
+    }
+}
+
+/// Our implementation of the Progolue trait
+#[derive(Clone, Serialize, Deserialize)]
+pub struct DiscoPrologue {
+    #[serde(with = "BigArray")]
+    data: [u8; 256],
+    len: usize,
+}
+
+impl Prologue for DiscoPrologue {}
+
+impl Default for DiscoPrologue {
+    fn default() -> Self {
+        Self {
+            data: [0u8; 256],
+            len: 0,
+        }
+    }
+}
+
+impl AsRef<[u8]> for DiscoPrologue {
+    fn as_ref(&self) -> &[u8] {
+        &self.data[..self.len]
+    }
+}
+
+impl FromStr for DiscoPrologue {
+    type Err = Error;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let mut data = [0u8; 256];
+        let len = if s.len() > 256 { 256 } else { s.len() };
+        data[..len].copy_from_slice(&s.as_bytes()[..len]);
+        Ok(Self { data, len })
     }
 }
 
@@ -348,7 +481,7 @@ impl From<&[u8; 8]> for DiscoNonce {
 /// to happen in a specific order to be valid. Once the handshake with a key agreement operation
 /// has completed, nonces are part of the encrypted payload of the message so nonce-based denial of
 /// service attacks are entirely prevented unless one endpoint is malicious.
-#[derive(Clone)]
+#[derive(Clone, Default, Serialize, Deserialize)]
 pub struct DiscoNonceGenerator {
     current: u64,
     threshold: u64,
@@ -363,7 +496,7 @@ impl DiscoNonceGenerator {
     }
 }
 
-impl<'a> NonceGenerator<'a, DiscoTag, DiscoNonce> for DiscoNonceGenerator {
+impl NonceGenerator<DiscoTag, DiscoNonce> for DiscoNonceGenerator {
     /// generate a new nonce
     fn generate(&mut self, _rng: impl RngCore + CryptoRng) -> DiscoNonce {
         let nonce = self.current;

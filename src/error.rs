@@ -1,3 +1,7 @@
+/*
+    Copyright David Huseby, All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+*/
 use thiserror::Error;
 
 /// Disco errors
@@ -114,6 +118,9 @@ pub enum ProtocolError {
     /// An invalid op in the transport state
     #[error("invalid transport op")]
     InvalidTransportOp,
+    /// The channel states aren't the same
+    #[error("channel state mismatch")]
+    ChannelStateMismatch,
 }
 
 /// Errors related to tag parsing

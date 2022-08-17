@@ -19,6 +19,18 @@ difficult. The example implementation in the `test` folder uses a
 simplistic sliding window approach to tracking nonces for demonstration
 purposes.
 
+One other novel detail in this implementation is the use of the "channel
+states" as a 32-byte session identifier at the start of every message.
+This crate is built with full support for serde to serialize and
+deserialize the sessions to disk. Because the serialization stores the
+full internal keccak state, you must treat it like a secret key or other
+similarly secret data. Before serializing a session to persistent
+storage, call the `get_channel_state(true)` function to get the 32-byte
+inbound channel state and use that to index to the stored session data.
+Then when you receive an encrypted disco message, you can read the first
+32-bytes and know which Disco session to deserialize from storage for
+processing the message.
+
 This is not a plug-and-play solution. You will need to do some coding to
 make this work for you. There are five traits in this crate that you
 must impl with your own chosen cryptography library. They can be found

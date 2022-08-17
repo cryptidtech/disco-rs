@@ -1,9 +1,14 @@
+/*
+    Copyright David Huseby, All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+*/
 use crate::{
     error::{BuilderError, Error},
     handshake::HandshakeState,
     key::{KeyAgreement, KeyGenerator, KeyType},
     nonce::NonceGenerator,
     params::Params,
+    prologue::Prologue,
     session::Session,
     tag::{Tag, TaggedData},
 };
@@ -12,22 +17,23 @@ use strobe_rs::{SecParam, Strobe};
 
 /// Generates a [`HandshakeState`] and also validates that all of the
 /// prerequisites for the given parameters are satisfied.
-pub struct Builder<'a, K, NG, T, N, P, S, SS>
+pub struct Builder<K, NG, PG, T, N, P, S, SS>
 where
-    K: KeyType + KeyGenerator<'a, T, P, S> + KeyAgreement<'a, T, P, S, SS> + Clone,
-    NG: NonceGenerator<'a, T, N> + Clone,
-    T: Tag + Clone + Default,
-    N: TaggedData<'a, T> + Clone + Default,
-    P: TaggedData<'a, T> + Default + Clone,
-    S: TaggedData<'a, T> + Default + Clone,
-    SS: TaggedData<'a, T> + Default + Clone,
+    K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
+    NG: NonceGenerator<T, N>,
+    PG: Prologue,
+    T: Tag,
+    N: TaggedData<T>,
+    P: TaggedData<T>,
+    S: TaggedData<T>,
+    SS: TaggedData<T>,
 {
     /// Disco params
-    params: Params<'a, K, T, N, P, S, SS>,
+    params: Params<K, T, N, P, S, SS>,
     /// Nonce generator
     nonces: NG,
     /// Protocol prologue
-    prologue: &'a [u8],
+    prologue: PG,
     /// Local static secret key
     local_static_secret_key: S,
     /// Local static public key
@@ -45,25 +51,26 @@ where
     /// Re-key threshold
     rekey_in: u64,
     // phantom marker
-    _t: PhantomData<&'a T>,
+    _t: PhantomData<T>,
 }
 
-impl<'a, K, NG, T, N, P, S, SS> Builder<'a, K, NG, T, N, P, S, SS>
+impl<K, NG, PG, T, N, P, S, SS> Builder<K, NG, PG, T, N, P, S, SS>
 where
-    K: KeyType + KeyGenerator<'a, T, P, S> + KeyAgreement<'a, T, P, S, SS> + Clone,
-    NG: NonceGenerator<'a, T, N> + Clone,
-    T: Tag + Clone + Default,
-    N: TaggedData<'a, T> + Clone + Default,
-    P: TaggedData<'a, T> + Default + Clone,
-    S: TaggedData<'a, T> + Default + Clone,
-    SS: TaggedData<'a, T> + Default + Clone,
+    K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
+    NG: NonceGenerator<T, N>,
+    PG: Prologue,
+    T: Tag,
+    N: TaggedData<T>,
+    P: TaggedData<T>,
+    S: TaggedData<T>,
+    SS: TaggedData<T>,
 {
     /// Construct a new builder from DiscoParams
-    pub fn new(params: &Params<'a, K, T, N, P, S, SS>, nonces: &NG) -> Self {
+    pub fn new(params: &Params<K, T, N, P, S, SS>, nonces: &NG) -> Self {
         Builder {
             params: params.clone(),
             nonces: nonces.clone(),
-            prologue: &[],
+            prologue: PG::default(),
             local_static_secret_key: S::default(),
             local_static_public_key: P::default(),
             local_ephemeral_secret_key: S::default(),
@@ -77,8 +84,8 @@ where
     }
 
     /// Add prologue byte sequence that both parties want to confirm is identical
-    pub fn with_prologue(mut self, data: &'a [u8]) -> Self {
-        self.prologue = data;
+    pub fn with_prologue(mut self, data: &PG) -> Self {
+        self.prologue = data.clone();
         self
     }
 
@@ -131,17 +138,17 @@ where
     }
 
     /// Build an initiator disco session
-    pub fn build_initiator(self) -> Result<Session<'a, K, NG, T, N, P, S, SS>, Error> {
+    pub fn build_initiator(self) -> Result<Session<K, NG, PG, T, N, P, S, SS>, Error> {
         self.build(true)
     }
 
     /// Build a responder disco session
-    pub fn build_responder(self) -> Result<Session<'a, K, NG, T, N, P, S, SS>, Error> {
+    pub fn build_responder(self) -> Result<Session<K, NG, PG, T, N, P, S, SS>, Error> {
         self.build(false)
     }
 
     /// Construct the disco session
-    pub fn build(self, initiator: bool) -> Result<Session<'a, K, NG, T, N, P, S, SS>, Error> {
+    pub fn build(self, initiator: bool) -> Result<Session<K, NG, PG, T, N, P, S, SS>, Error> {
         if self.local_static_secret_key.get_tag().get_data_length() == 0
             && self.params.handshake.needs_local_static_key(initiator)
         {

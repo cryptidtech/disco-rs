@@ -1,11 +1,16 @@
+/*
+    Copyright David Huseby, All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+*/
 use crate::error::{Error, ParamError};
 use core::{
     fmt::{Display, Error as FmtError, Formatter},
     str::FromStr,
 };
+use serde::{Deserialize, Serialize};
 
 /// Identifiers for the different keys referenced in handshake scripts
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum HandshakeData {
     /// Local ephemeral public key
     Epub,
@@ -29,7 +34,7 @@ pub enum HandshakeData {
 
 /// Different operations to perform in handshake scripts, see §5 of
 /// https://www.discocrypto.com/disco.html
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum HandshakeOp {
     /// Generate a new key pair
     GenKey,
@@ -52,7 +57,7 @@ pub enum HandshakeOp {
 }
 
 /// The state of the handshake so that this is resumable
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug, Deserialize, Serialize)]
 pub struct HandshakeState {
     handshake: Handshake,
     initiator: bool,
@@ -88,7 +93,7 @@ impl Iterator for HandshakeState {
 }
 
 /// The handshake patterns we support for now
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum Handshake {
     /// One-way, no static key for initiator
     N,

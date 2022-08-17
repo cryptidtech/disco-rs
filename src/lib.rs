@@ -1,3 +1,7 @@
+/*
+    Copyright David Huseby, All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+*/
 //!
 #![feature(trait_alias)]
 #![warn(missing_docs)]
@@ -29,6 +33,8 @@ pub mod key;
 pub mod nonce;
 /// Disco params
 pub mod params;
+/// Disco prologue trait
+pub mod prologue;
 /// Disco session
 pub mod session;
 /// Disco tag trait

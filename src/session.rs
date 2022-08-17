@@ -1,3 +1,7 @@
+/*
+    Copyright David Huseby, All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+*/
 use crate::{
     error::ProtocolError,
     handshake::{HandshakeData, HandshakeOp, HandshakeState},
@@ -5,10 +9,12 @@ use crate::{
     key::{KeyAgreement, KeyGenerator, KeyType},
     nonce::NonceGenerator,
     params::Params,
+    prologue::Prologue,
     tag::{Tag, TaggedData},
     transport::{Transport, TransportData, TransportOp, TransportState},
     Result,
 };
+use serde::{Deserialize, Serialize};
 use strobe_rs::Strobe;
 
 /// The maximum size of a single message in bytes (64KB)
@@ -19,16 +25,17 @@ pub const MSG_MAX_LEN: usize = u16::max_value() as usize;
 /// Strobe state accordingly. The handshake script is determined by the
 /// handshake name (e.g. XX, XK1, KK1) and the elliptic curve protocol is
 /// determined by the protocol name (e.g. 25519 for Curve25519, etc).
-#[derive(Clone)]
-pub enum Session<'a, K, NG, T, N, P, S, SS>
+#[derive(Clone, Serialize, Deserialize)]
+pub enum Session<K, NG, PG, T, N, P, S, SS>
 where
-    K: KeyType + KeyGenerator<'a, T, P, S> + KeyAgreement<'a, T, P, S, SS> + Clone,
-    NG: NonceGenerator<'a, T, N> + Clone,
-    T: Tag + Clone + Default,
-    N: TaggedData<'a, T> + Default + Clone,
-    P: TaggedData<'a, T> + Default + Clone,
-    S: TaggedData<'a, T> + Default + Clone,
-    SS: TaggedData<'a, T> + Default + Clone,
+    K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
+    NG: NonceGenerator<T, N>,
+    PG: Prologue,
+    T: Tag,
+    N: TaggedData<T>,
+    P: TaggedData<T>,
+    S: TaggedData<T>,
+    SS: TaggedData<T>,
 {
     /// Sending/receiving the first message transitions to this state and we
     /// stay in this state until the handshake script is complete
@@ -36,7 +43,7 @@ where
         /// Strobe state
         strobe: Strobe,
         /// Disco parameters
-        params: Params<'a, K, T, N, P, S, SS>,
+        params: Params<K, T, N, P, S, SS>,
         /// Nonces generator and tracker
         nonces: NG,
         /// Handshake state
@@ -54,7 +61,7 @@ where
         /// True if a keying operation has been completed
         is_keyed: bool,
         /// Optional prologue data
-        prologue: &'a [u8],
+        prologue: PG,
         /// Optional local static public key
         sp: P,
         /// Optional local static secret key
@@ -77,7 +84,7 @@ where
     /// one half-duplex strobe for each direction
     Transport {
         /// Disco parameters
-        params: Params<'a, K, T, N, P, S, SS>,
+        params: Params<K, T, N, P, S, SS>,
         /// The inbound strobe state
         in_strobe: Strobe,
         /// State for inbound channel
@@ -113,15 +120,16 @@ where
     },
 }
 
-impl<'a, K, NG, T, N, P, S, SS> Session<'a, K, NG, T, N, P, S, SS>
+impl<K, NG, PG, T, N, P, S, SS> Session<K, NG, PG, T, N, P, S, SS>
 where
-    K: KeyType + KeyGenerator<'a, T, P, S> + KeyAgreement<'a, T, P, S, SS> + Clone,
-    NG: NonceGenerator<'a, T, N> + Clone,
-    T: Tag + Clone + Default + 'a,
-    N: TaggedData<'a, T> + Clone + Default + 'a,
-    P: TaggedData<'a, T> + Default + Clone + 'a,
-    S: TaggedData<'a, T> + Default + Clone + 'a,
-    SS: TaggedData<'a, T> + Default + Clone + 'a,
+    K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
+    NG: NonceGenerator<T, N>,
+    PG: Prologue,
+    T: Tag,
+    N: TaggedData<T>,
+    P: TaggedData<T>,
+    S: TaggedData<T>,
+    SS: TaggedData<T>,
 {
     fn strobe_tag_to_message(
         strobe: &mut Strobe,
@@ -343,10 +351,47 @@ where
         }
     }
 
+    // this sends 32 bytes of data in the clear. this is used to send the PRF of the outbound
+    // channel so that the recipient knows which session the message is associated with. for
+    // out-of-order messaging this value only changes when a rekey happens so rekey often.
+    fn strobe_send_clr(
+        strobe: &mut Strobe,
+
+        // input
+        prf: &[u8; 32],
+
+        // output
+        out_buf: &mut [u8],
+        out_offset: usize,
+    ) -> Result<usize> {
+        out_buf[out_offset..out_offset + 32].copy_from_slice(&prf[..32]);
+        strobe.send_clr(&out_buf[out_offset..out_offset + 32], false);
+        Ok(32)
+    }
+
+    // this receives 32 bytes of data in the clear. this is used to receive the PRF of the inbound
+    // channel so that we maintain the same state as the sender. typically, a recipient will first
+    // read the 32 bytes from the inbount message and use it to know which disco session the
+    // message is associated with. once the disco session is restored, we need to receive the 32
+    // bytes to that our strobe state stays synchronized with the sender.
+    fn strobe_recv_clr(
+        strobe: &mut Strobe,
+
+        // input
+        in_buf: &[u8],    // buffer to read the message from
+        in_offset: usize, // offest in the buffer to start reading from
+
+        // output
+        prf: &mut [u8; 32],
+    ) -> Result<(usize, usize)> {
+        prf[..32].copy_from_slice(&in_buf[in_offset..in_offset + 32]);
+        strobe.recv_clr(&prf[..32], false);
+        Ok((32, 32))
+    }
+
     // this updates the messge counts and rekeys if needed or aborts if we're at our message limit
     fn update_message_counts(
         strobe: &mut Strobe,
-        out_of_order: bool,
         since_rekey: &mut u64,
         total: &mut u64,
         rekey_in: u64,
@@ -358,10 +403,6 @@ where
         if *since_rekey >= rekey_in {
             //println!("REKEYING NOW!! AFTER {} MSGS", rekey_in);
             strobe.ratchet(16, false);
-
-            if out_of_order {
-                strobe.meta_ratchet(0, false);
-            }
 
             // reset the counter
             *since_rekey = 0;
@@ -379,7 +420,7 @@ where
     // Extension specification (https://discocrypto.com/disco.html)
     fn split(
         strobe: &mut Strobe,
-        params: &Params<'a, K, T, N, P, S, SS>,
+        params: &Params<K, T, N, P, S, SS>,
         nonces: &NG,
         initiator: bool,
         out_of_order: bool,
@@ -539,7 +580,7 @@ where
                                         Esec => es.as_ref(),
                                         Psk => psk.as_ref(),
                                         Payload => in_buf,
-                                        Prologue => prologue,
+                                        Prologue => prologue.as_ref(),
                                         Re => re.as_ref(),
                                         Rs => rs.as_ref(),
                                         Spub => sp.as_ref(),
@@ -661,7 +702,6 @@ where
                             Stop => {
                                 Self::update_message_counts(
                                     strobe,
-                                    false, // handshake phase is always in-order
                                     msgs_since_rekey,
                                     msgs_total,
                                     *rekey_in,
@@ -675,7 +715,6 @@ where
                             Split => {
                                 Self::update_message_counts(
                                     strobe,
-                                    false, // handshake phase is always in-order
                                     msgs_since_rekey,
                                     msgs_total,
                                     *rekey_in,
@@ -720,8 +759,15 @@ where
                 use TransportData::*;
                 use TransportOp::*;
 
-                // this tracks the strobe state for this message
-                let mut strobe = out_strobe.clone();
+                // in out-of-order sessions, we clone the strobe state for every message and keep
+                // the session strobe the same. in in-order sessions we use the same strobe state
+                // every time instead of a clone of an unchanging strobe state
+                let mut strobe_copy = out_strobe.clone();
+                let msg_strobe = if *out_of_order {
+                    &mut strobe_copy
+                } else {
+                    out_strobe
+                };
 
                 // this tracks the nonce for this message
                 let mut nonce = N::default();
@@ -734,7 +780,7 @@ where
                             MixHash(d) => {
                                 // mix the data into the strobe state
                                 Self::strobe_ad(
-                                    &mut strobe,
+                                    msg_strobe,
                                     match d {
                                         Nonce => nonce.as_ref(),
                                         _ => return Err(ProtocolError::InvalidHandshakeOp.into()),
@@ -745,9 +791,15 @@ where
                             // checking the nonce during a message send doesn't make sense
                             CheckNonce => return Err(ProtocolError::InvalidTransportOp.into()),
 
-                            // get the channel state and store it
-                            GetChannelState => {
-                                strobe.prf(out_prf, false);
+                            // send the channel state as a session identifier
+                            SendChannelState => {
+                                out_idx +=
+                                    Self::strobe_send_clr(msg_strobe, &out_prf, out_buf, out_idx)?;
+                            }
+
+                            // recv the channel state is an error
+                            RecvChannelState => {
+                                return Err(ProtocolError::ReceivingPrf.into());
                             }
 
                             // get a new nonce value
@@ -759,7 +811,7 @@ where
                             EncryptAndHash(d) => {
                                 // get the data to mix
                                 out_idx += Self::strobe_to_message(
-                                    &mut strobe,
+                                    msg_strobe,
                                     *is_keyed,
                                     match d {
                                         Payload => &tt,
@@ -794,23 +846,16 @@ where
                             // delivery we need to make sure the current strobe state becomes the
                             // strobe state we save for the next message
                             Stop => {
-                                let s: &mut Strobe = if *out_of_order {
-                                    &mut strobe
-                                } else {
-                                    out_strobe
-                                };
-
                                 Self::update_message_counts(
-                                    s,
-                                    *out_of_order,
+                                    msg_strobe,
                                     out_msgs_since_rekey,
                                     msgs_total,
                                     *rekey_in,
                                 )?;
 
-                                // if we're in-order then save the strobe state for next time
+                                // if we're in-order then update the channel state
                                 if !*out_of_order {
-                                    *out_strobe = strobe.clone();
+                                    msg_strobe.prf(out_prf, false);
                                 }
                                 return Ok(out_idx);
                             }
@@ -889,7 +934,7 @@ where
                                         Esec => es.as_ref(),
                                         Psk => psk.as_ref(),
                                         Payload => &out_buf[out_idx..],
-                                        Prologue => prologue,
+                                        Prologue => prologue.as_ref(),
                                         Re => re.as_ref(),
                                         Rs => rs.as_ref(),
                                         Spub => sp.as_ref(),
@@ -1010,7 +1055,6 @@ where
                             Stop => {
                                 Self::update_message_counts(
                                     strobe,
-                                    false, // handshake message are always in-order
                                     msgs_since_rekey,
                                     msgs_total,
                                     *rekey_in,
@@ -1023,7 +1067,6 @@ where
                             Split => {
                                 Self::update_message_counts(
                                     strobe,
-                                    false, // handshake message are always in-order
                                     msgs_since_rekey,
                                     msgs_total,
                                     *rekey_in,
@@ -1067,8 +1110,14 @@ where
                 use TransportData::*;
                 use TransportOp::*;
 
-                // this tracks the strobe state for this message
-                let mut strobe = in_strobe.clone();
+                // in out-of-order sessions, we clone the strobe state for every message and kep
+                // the session strobe the same until a rekey happens
+                let mut strobe_copy = in_strobe.clone();
+                let msg_strobe = if *out_of_order {
+                    &mut strobe_copy
+                } else {
+                    in_strobe
+                };
 
                 // this tracks the nonce for this message
                 let mut nonce = N::default();
@@ -1081,7 +1130,7 @@ where
                             MixHash(d) => {
                                 // mix the data into the strobe state
                                 Self::strobe_ad(
-                                    &mut strobe,
+                                    msg_strobe,
                                     match d {
                                         Nonce => nonce.as_ref(),
                                         _ => return Err(ProtocolError::InvalidHandshakeOp.into()),
@@ -1097,12 +1146,25 @@ where
                                 }
                             }
 
-                            // get the channel state and store it
-                            GetChannelState => {
-                                strobe.prf(in_prf, false);
+                            // send the channel state is an error
+                            SendChannelState => {
+                                return Err(ProtocolError::SendingPrf.into());
                             }
 
-                            // getting a nonce during a message send doesn't make sense
+                            // recv the channel state and make sure it matches
+                            RecvChannelState => {
+                                let mut prf = [0u8; 32];
+                                let (i, _) =
+                                    Self::strobe_recv_clr(msg_strobe, in_buf, in_idx, &mut prf)?;
+                                in_idx += i;
+
+                                // make sure that the prf matches the current channel state
+                                if prf != *in_prf {
+                                    return Err(ProtocolError::ChannelStateMismatch.into());
+                                }
+                            }
+
+                            // getting the nonce so that we can keep the strobe state synchronized
                             GetNonce => {
                                 if !*out_of_order {
                                     // in-order delivery requires getting a nonce and mixing it in
@@ -1114,7 +1176,7 @@ where
                                 }
                             }
 
-                            // encrypt and hash the outbound data
+                            // encrypt and hash the outbound data is an error
                             EncryptAndHash(_) => {
                                 return Err(ProtocolError::InvalidState.into());
                             }
@@ -1123,7 +1185,7 @@ where
                             DecryptAndHash(d) => {
                                 // receive the incoming data
                                 let (i, o) = Self::strobe_from_message(
-                                    &mut strobe,
+                                    msg_strobe,
                                     *is_keyed,
                                     in_buf,
                                     in_idx,
@@ -1151,32 +1213,52 @@ where
                                 };
                             }
 
-                            // building the message is done, if we're doing in-order message
-                            // delivery we need to make sure the current strobe state becomes the
-                            // strobe state we save for the next message
+                            // building the message is done.
                             Stop => {
-                                let s: &mut Strobe = if *out_of_order {
-                                    &mut strobe
-                                } else {
-                                    in_strobe
-                                };
-
+                                // this updates message counts and does a rekey if it is time to.
+                                // rekey's only affect in-order sessions. out-of-order sessions
+                                // must implement their own rekey protocol since messages created
+                                // before a rekey but delivered after a rekey cannot be decrypted.
                                 Self::update_message_counts(
-                                    s,
-                                    *out_of_order,
+                                    msg_strobe,
                                     in_msgs_since_rekey,
                                     msgs_total,
                                     *rekey_in,
                                 )?;
 
-                                // if we're in-order then save the strobe state for next time
+                                // if we're in-order, update the channel state after every message
                                 if !*out_of_order {
-                                    *in_strobe = strobe.clone();
+                                    msg_strobe.prf(in_prf, false);
                                 }
                                 return Ok((in_idx, out_idx));
                             }
                         }
                     }
+                }
+            }
+        }
+    }
+
+    /// Manually rekey the specified strobe state. This is really only useful for a higher level
+    /// protocol for doing rekeys in out-of-order sessions which requires more coordination than
+    /// automatic rekeying does.
+    pub fn rekey(&mut self, outbound: bool, out_of_order: bool) {
+        match self {
+            Session::Handshake { ref mut strobe, .. } => {
+                strobe.ratchet(16, false);
+                if out_of_order {
+                    strobe.meta_ratchet(0, false);
+                }
+            }
+            Session::Transport {
+                ref mut in_strobe,
+                ref mut out_strobe,
+                ..
+            } => {
+                let strobe = if outbound { out_strobe } else { in_strobe };
+                strobe.ratchet(16, false);
+                if out_of_order {
+                    strobe.meta_ratchet(0, false);
                 }
             }
         }
@@ -1198,8 +1280,8 @@ where
         }
     }
 
-    /// Get the post-handshake hash for channel binding. See §11.2 of the Noise Protocol spec
-    pub fn get_handshake_hash(&mut self, inbound: bool, hash: &mut [u8; 32]) -> Result<()> {
+    /// Get the channel state for channel binding. See §11.2 of the Noise Protocol spec
+    pub fn get_channel_state(&mut self, inbound: bool, hash: &mut [u8; 32]) -> Result<()> {
         match self {
             Session::Transport {
                 in_prf, out_prf, ..

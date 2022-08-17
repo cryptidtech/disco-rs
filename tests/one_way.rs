@@ -3,7 +3,9 @@ mod xeddsa;
 mod one_way {
     use crate::{
         common::{recv, send},
-        xeddsa::{DiscoBuilder, DiscoKeys, DiscoNonceGenerator, DiscoParams, DiscoSession},
+        xeddsa::{
+            DiscoBuilder, DiscoKeys, DiscoNonceGenerator, DiscoParams, DiscoPrologue, DiscoSession,
+        },
     };
     use disco_rs::session::MSG_MAX_LEN;
     use std::str::FromStr;
@@ -14,7 +16,7 @@ mod one_way {
 
         mod without_prologue {
             use super::{super::*, O};
-            const P: &'static [u8] = b"";
+            const P: &'static str = "";
             const R: u64 = u64::max_value() - 1;
 
             #[test]
@@ -45,7 +47,7 @@ mod one_way {
 
         mod with_prologue {
             use super::{super::*, O};
-            const P: &'static [u8] = b"the prologue";
+            const P: &'static str = "the prologue";
             const R: u64 = u64::max_value() - 1;
 
             #[test]
@@ -76,7 +78,7 @@ mod one_way {
 
         mod with_rekey {
             use super::{super::*, O};
-            const P: &'static [u8] = b"";
+            const P: &'static str = "";
             const R: u64 = 2; //rekey every 2 messages
 
             #[test]
@@ -111,7 +113,7 @@ mod one_way {
 
         mod without_prologue {
             use super::{super::*, O};
-            const P: &'static [u8] = b"";
+            const P: &'static str = "";
             const R: u64 = u64::max_value() - 1;
 
             #[test]
@@ -142,7 +144,7 @@ mod one_way {
 
         mod with_prologue {
             use super::{super::*, O};
-            const P: &'static [u8] = b"the prologue";
+            const P: &'static str = "the prologue";
             const R: u64 = u64::max_value() - 1;
 
             #[test]
@@ -173,7 +175,7 @@ mod one_way {
 
         mod with_rekey {
             use super::{super::*, O};
-            const P: &'static [u8] = b"";
+            const P: &'static str = "";
             const R: u64 = 2; //rekey every 2 messages
 
             #[test]
@@ -203,7 +205,7 @@ mod one_way {
         }
     }
 
-    fn do_n(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_n(ooo: bool, prologue: &str, rekey: u64) {
         // only need responder keys
         let r = DiscoKeys::r_keys();
 
@@ -212,6 +214,9 @@ mod one_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // <- s
         // ...
@@ -243,7 +248,7 @@ mod one_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_k(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_k(ooo: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -253,6 +258,9 @@ mod one_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // -> s
         // <- s
@@ -289,7 +297,7 @@ mod one_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_x(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_x(ooo: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -299,6 +307,9 @@ mod one_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // <- s
         // ...
@@ -334,7 +345,7 @@ mod one_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_npsk0(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_npsk0(ooo: bool, prologue: &str, rekey: u64) {
         // only need responder keys
         let r = DiscoKeys::r_keys();
         let psk = DiscoKeys::psk();
@@ -344,6 +355,9 @@ mod one_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // <- s
         // ...
@@ -377,7 +391,7 @@ mod one_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_kpsk0(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_kpsk0(ooo: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -388,6 +402,9 @@ mod one_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // -> s
         // <- s
@@ -426,7 +443,7 @@ mod one_way {
         do_it(ooo, &mut initiator, &mut responder);
     }
 
-    fn do_xpsk1(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_xpsk1(ooo: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -437,6 +454,9 @@ mod one_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // <- s
         // ...

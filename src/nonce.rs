@@ -1,3 +1,7 @@
+/*
+    Copyright David Huseby, All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+*/
 use crate::tag::{Tag, TaggedData};
 use rand_core::{CryptoRng, RngCore};
 
@@ -11,10 +15,10 @@ use rand_core::{CryptoRng, RngCore};
 /// not, the actual implementation is left to the user.
 
 /// Trait for generating nonces and checking if we seen a nonce
-pub trait NonceGenerator<'a, T, TD>
+pub trait NonceGenerator<T, TD>: Clone + Default
 where
-    T: Tag + Default,
-    TD: TaggedData<'a, T> + Clone + Default,
+    T: Tag,
+    TD: TaggedData<T>,
 {
     /// Generate a new nonce
     fn generate(&mut self, rng: impl RngCore + CryptoRng) -> TD;

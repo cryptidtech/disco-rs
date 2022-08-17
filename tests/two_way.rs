@@ -3,7 +3,9 @@ mod xeddsa;
 mod two_way {
     use crate::{
         common::{recv, send, send_and_recv},
-        xeddsa::{DiscoBuilder, DiscoKeys, DiscoNonceGenerator, DiscoParams, DiscoSession},
+        xeddsa::{
+            DiscoBuilder, DiscoKeys, DiscoNonceGenerator, DiscoParams, DiscoPrologue, DiscoSession,
+        },
     };
     use disco_rs::session::MSG_MAX_LEN;
     use std::str::FromStr;
@@ -13,142 +15,193 @@ mod two_way {
 
         mod without_prologue {
             use super::{super::*, O};
-            const P: &'static [u8] = b"";
+            const P: &'static str = "";
             const R: u64 = u64::max_value() - 1;
+            const S: bool = false;
 
             #[test]
             fn nn() {
-                do_nn(O, P, R);
+                do_nn(O, S, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P, R);
+                do_kk(O, S, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P, R);
+                do_xx(O, S, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P, R);
+                do_ik(O, S, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P, R);
+                do_ix(O, S, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P, R);
+                do_nk(O, S, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P, R);
+                do_nx(O, S, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P, R);
+                do_xk1(O, S, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P, R);
+                do_kk1(O, S, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P, R);
+                do_nnpsk2(O, S, P, R);
             }
         }
 
         mod with_prologue {
             use super::{super::*, O};
-            const P: &'static [u8] = b"the prologue";
+            const P: &'static str = "the prologue";
             const R: u64 = u64::max_value() - 1;
+            const S: bool = false;
 
             #[test]
             fn nn() {
-                do_nn(O, P, R);
+                do_nn(O, S, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P, R);
+                do_kk(O, S, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P, R);
+                do_xx(O, S, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P, R);
+                do_ik(O, S, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P, R);
+                do_ix(O, S, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P, R);
+                do_nk(O, S, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P, R);
+                do_nx(O, S, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P, R);
+                do_xk1(O, S, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P, R);
+                do_kk1(O, S, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P, R);
+                do_nnpsk2(O, S, P, R);
             }
         }
 
         mod with_rekey {
             use super::{super::*, O};
-            const P: &'static [u8] = b"the prologue";
+            const P: &'static str = "the prologue";
             const R: u64 = 2; // rekey every 2 msgs
+            const S: bool = false;
 
             #[test]
             fn nn() {
-                do_nn(O, P, R);
+                do_nn(O, S, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P, R);
+                do_kk(O, S, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P, R);
+                do_xx(O, S, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P, R);
+                do_ik(O, S, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P, R);
+                do_ix(O, S, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P, R);
+                do_nk(O, S, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P, R);
+                do_nx(O, S, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P, R);
+                do_xk1(O, S, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P, R);
+                do_kk1(O, S, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P, R);
+                do_nnpsk2(O, S, P, R);
+            }
+        }
+
+        mod serialized_sessions {
+            use super::{super::*, O};
+            const P: &'static str = "the prologue";
+            const R: u64 = 2; // rekey every 2 msgs
+            const S: bool = true;
+
+            #[test]
+            fn nn() {
+                do_nn(O, S, P, R);
+            }
+            #[test]
+            fn kk() {
+                do_kk(O, S, P, R);
+            }
+            #[test]
+            fn xx() {
+                do_xx(O, S, P, R);
+            }
+            #[test]
+            fn ik() {
+                do_ik(O, S, P, R);
+            }
+            #[test]
+            fn ix() {
+                do_ix(O, S, P, R);
+            }
+            #[test]
+            fn nk() {
+                do_nk(O, S, P, R);
+            }
+            #[test]
+            fn nx() {
+                do_nx(O, S, P, R);
+            }
+            #[test]
+            fn xk1() {
+                do_xk1(O, S, P, R);
+            }
+            #[test]
+            fn kk1() {
+                do_kk1(O, S, P, R);
+            }
+            #[test]
+            fn nnpsk2() {
+                do_nnpsk2(O, S, P, R);
             }
         }
     }
@@ -158,152 +211,205 @@ mod two_way {
 
         mod without_prologue {
             use super::{super::*, O};
-            const P: &'static [u8] = b"";
+            const P: &'static str = "";
             const R: u64 = u64::max_value() - 1;
+            const S: bool = false;
 
             #[test]
             fn nn() {
-                do_nn(O, P, R);
+                do_nn(O, S, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P, R);
+                do_kk(O, S, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P, R);
+                do_xx(O, S, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P, R);
+                do_ik(O, S, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P, R);
+                do_ix(O, S, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P, R);
+                do_nk(O, S, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P, R);
+                do_nx(O, S, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P, R);
+                do_xk1(O, S, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P, R);
+                do_kk1(O, S, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P, R);
+                do_nnpsk2(O, S, P, R);
             }
         }
 
         mod with_prologue {
             use super::{super::*, O};
-            const P: &'static [u8] = b"the prologue";
+            const P: &'static str = "the prologue";
             const R: u64 = u64::max_value() - 1;
+            const S: bool = false;
 
             #[test]
             fn nn() {
-                do_nn(O, P, R);
+                do_nn(O, S, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P, R);
+                do_kk(O, S, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P, R);
+                do_xx(O, S, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P, R);
+                do_ik(O, S, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P, R);
+                do_ix(O, S, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P, R);
+                do_nk(O, S, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P, R);
+                do_nx(O, S, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P, R);
+                do_xk1(O, S, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P, R);
+                do_kk1(O, S, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P, R);
+                do_nnpsk2(O, S, P, R);
             }
         }
 
         mod with_rekey {
             use super::{super::*, O};
-            const P: &'static [u8] = b"the prologue";
+            const P: &'static str = "the prologue";
             const R: u64 = 2; // rekey every 2 msgs
+            const S: bool = false;
 
             #[test]
             fn nn() {
-                do_nn(O, P, R);
+                do_nn(O, S, P, R);
             }
             #[test]
             fn kk() {
-                do_kk(O, P, R);
+                do_kk(O, S, P, R);
             }
             #[test]
             fn xx() {
-                do_xx(O, P, R);
+                do_xx(O, S, P, R);
             }
             #[test]
             fn ik() {
-                do_ik(O, P, R);
+                do_ik(O, S, P, R);
             }
             #[test]
             fn ix() {
-                do_ix(O, P, R);
+                do_ix(O, S, P, R);
             }
             #[test]
             fn nk() {
-                do_nk(O, P, R);
+                do_nk(O, S, P, R);
             }
             #[test]
             fn nx() {
-                do_nx(O, P, R);
+                do_nx(O, S, P, R);
             }
             #[test]
             fn xk1() {
-                do_xk1(O, P, R);
+                do_xk1(O, S, P, R);
             }
             #[test]
             fn kk1() {
-                do_kk1(O, P, R);
+                do_kk1(O, S, P, R);
             }
             #[test]
             fn nnpsk2() {
-                do_nnpsk2(O, P, R);
+                do_nnpsk2(O, S, P, R);
+            }
+        }
+        mod serialized_sessions {
+            use super::{super::*, O};
+            const P: &'static str = "the prologue";
+            const R: u64 = 2; // rekey every 2 msgs
+            const S: bool = true;
+
+            #[test]
+            fn nn() {
+                do_nn(O, S, P, R);
+            }
+            #[test]
+            fn kk() {
+                do_kk(O, S, P, R);
+            }
+            #[test]
+            fn xx() {
+                do_xx(O, S, P, R);
+            }
+            #[test]
+            fn ik() {
+                do_ik(O, S, P, R);
+            }
+            #[test]
+            fn ix() {
+                do_ix(O, S, P, R);
+            }
+            #[test]
+            fn nk() {
+                do_nk(O, S, P, R);
+            }
+            #[test]
+            fn nx() {
+                do_nx(O, S, P, R);
+            }
+            #[test]
+            fn xk1() {
+                do_xk1(O, S, P, R);
+            }
+            #[test]
+            fn kk1() {
+                do_kk1(O, S, P, R);
+            }
+            #[test]
+            fn nnpsk2() {
+                do_nnpsk2(O, S, P, R);
             }
         }
     }
 
-    fn do_nn(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_nn(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // create the params with the correct protocol string
         let params = DiscoParams::from_str("Noise_NN_25519_STROBEv1.0.2").unwrap();
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // -> e, ee
 
@@ -326,10 +432,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_kk(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_kk(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -339,6 +445,9 @@ mod two_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // -> s
         // <- s
@@ -373,10 +482,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_xx(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_xx(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -386,6 +495,9 @@ mod two_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // -> e
         // <- e, ee, s, es
@@ -417,10 +529,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_ik(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_ik(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -430,6 +542,9 @@ mod two_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // <- s
         // ...
@@ -462,10 +577,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_ix(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_ix(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -475,6 +590,9 @@ mod two_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // -> e, s
         // <- e, ee, se, s, es
@@ -504,10 +622,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_nk(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_nk(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let r = DiscoKeys::r_keys();
 
@@ -516,6 +634,9 @@ mod two_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // <- s
         // ...
@@ -545,10 +666,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_nx(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_nx(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let r = DiscoKeys::r_keys();
 
@@ -557,6 +678,9 @@ mod two_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // -> e, es
         // <- e, ee, s, es
@@ -585,10 +709,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_xk1(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_xk1(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -598,6 +722,9 @@ mod two_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // <- s
         // ...
@@ -633,10 +760,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_kk1(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_kk1(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // get initiator and responder keys
         let i = DiscoKeys::i_keys();
         let r = DiscoKeys::r_keys();
@@ -646,6 +773,9 @@ mod two_way {
 
         // create the nonce generator
         let nonces = DiscoNonceGenerator::new(16);
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // <- s
         // -> s
@@ -678,10 +808,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_nnpsk2(ooo: bool, prologue: &'static [u8], rekey: u64) {
+    fn do_nnpsk2(ooo: bool, sleep: bool, prologue: &str, rekey: u64) {
         // create the params with the correct protocol string
         let params = DiscoParams::from_str("Noise_NNpsk2_25519_STROBEv1.0.2").unwrap();
 
@@ -690,6 +820,9 @@ mod two_way {
 
         // get the pre-shared key
         let psk = DiscoKeys::psk();
+
+        // create the prologue
+        let prologue = &DiscoPrologue::from_str(prologue).unwrap();
 
         // -> e
         // <- e, ee, psk
@@ -715,10 +848,10 @@ mod two_way {
         assert!(!initiator.is_keyed());
         assert!(!responder.is_keyed());
 
-        do_it(ooo, &mut initiator, &mut responder);
+        do_it(ooo, sleep, &mut initiator, &mut responder);
     }
 
-    fn do_it(ooo: bool, initiator: &mut DiscoSession, responder: &mut DiscoSession) {
+    fn do_it(ooo: bool, sleep: bool, initiator: &mut DiscoSession, responder: &mut DiscoSession) {
         let mut plaintext = [0u8; MSG_MAX_LEN];
         let mut i_plaintext_recv = [0u8; MSG_MAX_LEN];
         let mut i2r_ciphertext = [0u8; MSG_MAX_LEN];
@@ -755,13 +888,19 @@ mod two_way {
         assert!(initiator.is_transport());
         assert!(responder.is_transport());
 
+        let mut initiator_id = [0u8; 32];
+        let mut responder_id = [0u8; 32];
+
         // now that we're in transport mode we can do in-order or out-of order message delivery in
         // both directions
+
+        let mut i: &mut DiscoSession = initiator;
+        let mut r: &mut DiscoSession = responder;
 
         // initiator ---> responder
 
         send(
-            initiator,
+            i,
             &in_order,
             &plaintext,
             &pt,
@@ -770,8 +909,20 @@ mod two_way {
             0,
         );
 
+        // get the inbound channel state from the responder
+        r.get_channel_state(true, &mut responder_id).unwrap();
+        // make sure it matches the channel state in the message
+        assert_eq!(responder_id, i2r_ciphertext[..32]);
+
+        let sleeping_responder = serde_cbor::to_vec(r).unwrap();
+        assert!(sleeping_responder.len() > 0);
+        let mut r1: DiscoSession = serde_cbor::from_slice(&sleeping_responder).unwrap();
+
+        // if sleeping, switch to the session that has been serialized and deserialized
+        r = if sleep { &mut r1 } else { responder };
+
         recv(
-            responder,
+            r,
             recv_order,
             &mut r_plaintext_recv,
             &i2r_ciphertext,
@@ -782,7 +933,7 @@ mod two_way {
         // initiator <--- responder
 
         send(
-            responder,
+            r,
             &in_order,
             &plaintext,
             &pt,
@@ -791,8 +942,20 @@ mod two_way {
             0,
         );
 
+        // get the inbound channel state from the responder
+        i.get_channel_state(true, &mut initiator_id).unwrap();
+        // make sure it matches the channel state in the message
+        assert_eq!(initiator_id, r2i_ciphertext[..32]);
+
+        let sleeping_initiator = serde_cbor::to_vec(i).unwrap();
+        assert!(sleeping_initiator.len() > 0);
+        let mut i1: DiscoSession = serde_cbor::from_slice(&sleeping_initiator).unwrap();
+
+        // if sleeping, switch to the session that has been serialized and deserialized
+        i = if sleep { &mut i1 } else { initiator };
+
         recv(
-            initiator,
+            i,
             &recv_order,
             &mut i_plaintext_recv,
             &r2i_ciphertext,

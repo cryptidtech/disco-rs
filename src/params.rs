@@ -1,3 +1,7 @@
+/*
+    Copyright David Huseby, All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+*/
 use crate::{
     error::{Error, ParamError},
     handshake::Handshake,
@@ -10,18 +14,19 @@ use core::{
     str::FromStr,
 };
 use semver::{Version, VersionReq};
+use serde::{Deserialize, Serialize};
 use strobe_rs::STROBE_VERSION;
 
 /// Encapsulates the handshake parameters
-#[derive(PartialEq, Clone, Debug)]
-pub struct Params<'a, K, T, N, P, S, SS>
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
+pub struct Params<K, T, N, P, S, SS>
 where
-    K: KeyType + KeyGenerator<'a, T, P, S> + KeyAgreement<'a, T, P, S, SS> + Clone,
-    T: Tag + Clone + Default,
-    N: TaggedData<'a, T> + Clone + Default,
-    P: TaggedData<'a, T> + Default + Clone,
-    S: TaggedData<'a, T> + Default + Clone,
-    SS: TaggedData<'a, T> + Default + Clone,
+    K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
+    T: Tag,
+    N: TaggedData<T>,
+    P: TaggedData<T>,
+    S: TaggedData<T>,
+    SS: TaggedData<T>,
 {
     /// The protocol name
     pub protocol: Protocol,
@@ -32,21 +37,21 @@ where
     /// The strobe protocol version
     pub version: StrobeVersion,
     // phantom markers
-    _t: PhantomData<&'a T>,
-    _n: PhantomData<&'a N>,
-    _p: PhantomData<&'a P>,
-    _s: PhantomData<&'a S>,
-    _ss: PhantomData<&'a SS>,
+    _t: PhantomData<T>,
+    _n: PhantomData<N>,
+    _p: PhantomData<P>,
+    _s: PhantomData<S>,
+    _ss: PhantomData<SS>,
 }
 
-impl<'a, K, T, N, P, S, SS> FromStr for Params<'a, K, T, N, P, S, SS>
+impl<K, T, N, P, S, SS> FromStr for Params<K, T, N, P, S, SS>
 where
-    K: KeyType + KeyGenerator<'a, T, P, S> + KeyAgreement<'a, T, P, S, SS> + Clone,
-    T: Tag + Clone + Default,
-    N: TaggedData<'a, T> + Clone + Default,
-    P: TaggedData<'a, T> + Default + Clone,
-    S: TaggedData<'a, T> + Default + Clone,
-    SS: TaggedData<'a, T> + Default + Clone,
+    K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
+    T: Tag,
+    N: TaggedData<T>,
+    P: TaggedData<T>,
+    S: TaggedData<T>,
+    SS: TaggedData<T>,
 {
     type Err = Error;
 
@@ -70,14 +75,14 @@ where
     }
 }
 
-impl<'a, K, T, N, P, S, SS> Display for Params<'a, K, T, N, P, S, SS>
+impl<K, T, N, P, S, SS> Display for Params<K, T, N, P, S, SS>
 where
-    K: KeyType + KeyGenerator<'a, T, P, S> + KeyAgreement<'a, T, P, S, SS> + Clone,
-    T: Tag + Clone + Default,
-    N: TaggedData<'a, T> + Clone + Default,
-    P: TaggedData<'a, T> + Default + Clone,
-    S: TaggedData<'a, T> + Default + Clone,
-    SS: TaggedData<'a, T> + Default + Clone,
+    K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
+    T: Tag,
+    N: TaggedData<T>,
+    P: TaggedData<T>,
+    S: TaggedData<T>,
+    SS: TaggedData<T>,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
         write!(
@@ -90,7 +95,7 @@ where
 
 /// The protocol naming string really should be Disco_XX_25519_STROBEv1.0.2
 /// instead of Noise_XX_25519_STROBEv1.0.2 but whatevs
-#[derive(PartialEq, Copy, Clone, Debug)]
+#[derive(PartialEq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum Protocol {
     /// Noise protocol
     Noise,
@@ -115,7 +120,7 @@ impl Display for Protocol {
 }
 
 /// The strobe version we support for now
-#[derive(PartialEq, Clone, Debug)]
+#[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
 pub struct StrobeVersion(Version);
 
 impl FromStr for StrobeVersion {

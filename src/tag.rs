@@ -1,3 +1,7 @@
+/*
+    Copyright David Huseby, All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+*/
 /// Disco streams consist of "tagged data" where a tag is sent before the data and the tag
 /// describes the data that follows. The tag specifies the type of data and the length of data.
 /// Disco is written in terms of a Tag trait and byte array.
@@ -9,7 +13,7 @@
 /// returned by AsMut<[u8]> and calls try_parse() to initiatlize the tag from the bytes. This
 /// allows for a tag to be decrypted, one byte at a time, until we have a valid tag so make sure
 /// that your tagging impl works this way.
-pub trait Tag: AsRef<[u8]> + AsMut<[u8]> {
+pub trait Tag: AsRef<[u8]> + AsMut<[u8]> + Clone + Default {
     /// Sets the length of the associated data
     fn set_data_length(&mut self, size: usize);
     /// Gets the length of the associated data
@@ -21,7 +25,7 @@ pub trait Tag: AsRef<[u8]> + AsMut<[u8]> {
 /// Disco operates on pieces of tagged data, this type owns the Tag but contains only a read-only
 /// reference to the data buffer. This is designed so the crate can work on tagged data items
 /// whether or not the caller gives us a raw buffer or not.
-pub trait TaggedData<'a, T: Tag>: AsRef<[u8]> + AsMut<[u8]> {
+pub trait TaggedData<T: Tag>: AsRef<[u8]> + AsMut<[u8]> + Clone + Default {
     /// Get the tag
     fn get_tag(&self) -> &T;
     /// Set the tag

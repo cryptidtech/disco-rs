@@ -1,3 +1,7 @@
+/*
+    Copyright David Huseby, All Rights Reserved.
+    SPDX-License-Identifier: Apache-2.0
+*/
 use crate::tag::{Tag, TaggedData};
 use core::{fmt::Display, str::FromStr};
 use rand_core::{CryptoRng, RngCore};
@@ -10,14 +14,14 @@ use rand_core::{CryptoRng, RngCore};
 /// algorithms and implementations.
 
 /// Trait for any key type identifier
-pub trait KeyType: FromStr + Display {}
+pub trait KeyType: FromStr + Clone + Display {}
 
 /// Trait for any key generator
-pub trait KeyGenerator<'a, T, P, S>
+pub trait KeyGenerator<T, P, S>: Clone + Default
 where
-    T: Tag + Default,
-    P: TaggedData<'a, T> + Clone + Default,
-    S: TaggedData<'a, T> + Clone + Default,
+    T: Tag,
+    P: TaggedData<T>,
+    S: TaggedData<T>,
 {
     /// Generate a new key pair...the first returned tagged data is the public key, the other is
     /// the secret key
@@ -25,12 +29,12 @@ where
 }
 
 /// Trait for doing a key agreement
-pub trait KeyAgreement<'a, T, P, S, SS>
+pub trait KeyAgreement<T, P, S, SS>: Clone + Default
 where
-    T: Tag + Default,
-    P: TaggedData<'a, T> + Clone + Default,
-    S: TaggedData<'a, T> + Clone + Default,
-    SS: TaggedData<'a, T> + Clone + Default,
+    T: Tag,
+    P: TaggedData<T>,
+    S: TaggedData<T>,
+    SS: TaggedData<T>,
 {
     /// The error type if something went wrong
     type Error;
