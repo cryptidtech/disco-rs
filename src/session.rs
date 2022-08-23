@@ -14,11 +14,16 @@ use crate::{
     transport::{Transport, TransportData, TransportOp, TransportState},
     Result,
 };
+use core::marker::PhantomData;
+use log::debug;
 use serde::{Deserialize, Serialize};
 use strobe_rs::Strobe;
 
 /// The maximum size of a single message in bytes (64KB)
 pub const MSG_MAX_LEN: usize = u16::max_value() as usize;
+
+/// The fixed size of MAC values in the protocol
+pub const MSG_MAC_LEN: usize = 16;
 
 /// The session state for a Disco connection. This ultimately wraps a Strobe
 /// state and handles the different Noise protocol messages by updating the
@@ -43,7 +48,7 @@ where
         /// Strobe state
         strobe: Strobe,
         /// Disco parameters
-        params: Params<K, T, N, P, S, SS>,
+        params: Params<K, T, P, S, SS>,
         /// Nonces generator and tracker
         nonces: NG,
         /// Handshake state
@@ -78,13 +83,15 @@ where
         psk: SS,
         /// Hash of the handshake state for channel binding
         prf: [u8; 32],
+        /// phantom data marker
+        _n: PhantomData<N>,
     },
 
     /// Completing the handshake script transitions to this state which has
     /// one half-duplex strobe for each direction
     Transport {
         /// Disco parameters
-        params: Params<K, T, N, P, S, SS>,
+        params: Params<K, T, P, S, SS>,
         /// The inbound strobe state
         in_strobe: Strobe,
         /// State for inbound channel
@@ -141,29 +148,44 @@ where
         // get the length of the tag bytes
         let tag_len = tag.as_ref().len();
 
+        // get our indexes
+        let tag_start = out_offset;
+        let tag_end = tag_start + tag_len;
+        let mac_start = tag_end;
+        let mac_end = mac_start + MSG_MAC_LEN;
+
+        // make sure we're not going to write beyond the end of the output buffer
+        if mac_end > out_buf.len() {
+            return Err(ProtocolError::InvalidBufferLen.into());
+        }
+
         // copy the tag bytes to the message
-        out_buf[out_offset..out_offset + tag_len].copy_from_slice(tag.as_ref());
+        out_buf[tag_start..tag_end].copy_from_slice(tag.as_ref());
 
         // if keyed then meta_send_enc otherwise meta_send_clr
         if is_keyed {
             // send the three bytes of tag data encrypted
-            //println!(
-            //    "SEND_META_ENC:\n\tPT: {:02x?}",
-            //    &out_buf[out_offset..out_offset + tag_len]
-            //);
-            strobe.meta_send_enc(&mut out_buf[out_offset..out_offset + tag_len], false);
-            //println!("\tCT: {:02x?})", &out_buf[out_offset..out_offset + tag_len]);
+            debug!(
+                "SEND_META_ENC:\n\tPT: {:02x?}",
+                &out_buf[tag_start..tag_end]
+            );
+            strobe.meta_send_enc(&mut out_buf[tag_start..tag_end], false);
+            debug!("\tCT: {:02x?})", &out_buf[tag_start..tag_end]);
         } else {
             // send the data in the clear
-            //println!(
-            //    "SEND_META_CLR({:02x?})",
-            //    &out_buf[out_offset..out_offset + tag_len]
-            //);
-            strobe.meta_send_clr(&out_buf[out_offset..out_offset + tag_len], false);
+            debug!("SEND_META_CLR({:02x?})", &out_buf[tag_start..tag_end]);
+            strobe.meta_send_clr(&out_buf[tag_start..tag_end], false);
         }
 
+        // make this composite
+        strobe.meta_ad(&MSG_MAC_LEN.to_ne_bytes(), false);
+        debug!("META_AD({:02x?})", &MSG_MAC_LEN.to_ne_bytes());
+        // add a mac for the framing data
+        strobe.meta_send_mac(&mut out_buf[mac_start..mac_end], false);
+        debug!("SEND_META_MAC({:02x?})", &out_buf[mac_start..mac_end]);
+
         // just return how many bytes we wrote
-        Ok(tag_len)
+        Ok(tag_len + MSG_MAC_LEN)
     }
 
     fn strobe_to_message(
@@ -175,36 +197,48 @@ where
         out_offset: usize,
     ) -> Result<usize> {
         let mut out_idx = out_offset;
+        let tag_len = in_tag.as_ref().len();
+        let data_len = in_tag.get_data_length();
+
+        // make sure we're not writing beyond the end of the output buffer
+        if out_offset + tag_len + data_len > out_buf.len() {
+            return Err(ProtocolError::InvalidBufferLen.into());
+        }
 
         // output the data tag to bytes
         out_idx += Self::strobe_tag_to_message(strobe, is_keyed, in_tag, out_buf, out_idx)?;
 
         // copy the data to the message
-        let data_len = in_tag.get_data_length();
         out_buf[out_idx..out_idx + data_len].copy_from_slice(&in_buf[..data_len]);
 
         // if keyed, the send_enc and send_mac, otherwise send_clr
+        // make this a composite operation by first meta_AD the data length
+        strobe.meta_ad(&data_len.to_ne_bytes(), false);
+        debug!("META_AD({:02x?})", &data_len.to_ne_bytes());
         out_idx += if is_keyed {
             // send the data encrypted
-            //println!(
-            //    "SEND_ENC:\n\tPT: {:02x?}",
-            //    &out_buf[out_idx..out_idx + data_len]
-            //);
+            debug!(
+                "SEND_ENC:\n\tPT: {:02x?}",
+                &out_buf[out_idx..out_idx + data_len]
+            );
             strobe.send_enc(&mut out_buf[out_idx..out_idx + data_len], false);
-            //println!("\tCT: {:02x?}", &out_buf[out_idx..out_idx + data_len]);
-            // send the mac
+            debug!("\tCT: {:02x?}", &out_buf[out_idx..out_idx + data_len]);
+            // make this a composite operation by first meta_AD the mac length
+            strobe.meta_ad(&MSG_MAC_LEN.to_ne_bytes(), false);
+            debug!("META_AD({:02x?})", &MSG_MAC_LEN.to_ne_bytes());
+            // followed by the mac itself
             strobe.send_mac(
                 &mut out_buf[out_idx + data_len..out_idx + data_len + 16],
                 false,
             );
-            //println!(
-            //    "SEND_MAC({:02x?})",
-            //    &out_buf[out_idx + data_len..out_idx + data_len + 16]
-            //);
+            debug!(
+                "SEND_MAC({:02x?})",
+                &out_buf[out_idx + data_len..out_idx + data_len + 16]
+            );
             data_len + 16
         } else {
             // send the data in the clear
-            //println!("SEND_CLR({:02x?})", &out_buf[out_idx..out_idx + data_len]);
+            debug!("SEND_CLR({:02x?})", &out_buf[out_idx..out_idx + data_len]);
             strobe.send_clr(&out_buf[out_idx..out_idx + data_len], false);
             data_len
         };
@@ -222,7 +256,6 @@ where
     ) -> Result<usize> {
         let mut in_idx = 0;
         let tag_len = tag.as_mut().len();
-        let mut debug_buf = [0u8; 9];
 
         // zero out the tag
         for i in 0..tag_len {
@@ -246,17 +279,19 @@ where
 
             // copy the next byte over to the tag buffer
             tag.as_mut()[in_idx] = in_buf[in_offset + in_idx];
-            debug_buf[in_idx] = in_buf[in_offset + in_idx];
 
             // if keyed then meta_recv_enc otherwise meta_recv_clr
             if is_keyed {
                 // recv and decrypt the next byte
-                //println!("RECV_META_ENC:\n\tCT: {:02x?}", &tag.as_ref()[in_idx..in_idx + 1]);
+                debug!(
+                    "RECV_META_ENC:\n\tCT: {:02x?}",
+                    &tag.as_ref()[in_idx..in_idx + 1]
+                );
                 strobe.meta_recv_enc(&mut tag.as_mut()[in_idx..in_idx + 1], more);
-                //println!("\tPT: {:02x?}", &tag.as_ref()[in_idx..in_idx + 1]);
+                debug!("\tPT: {:02x?}", &tag.as_ref()[in_idx..in_idx + 1]);
             } else {
                 // recv the next byte
-                //println!("RECV_META_CLR({:02x?})", &tag.as_ref()[in_idx..in_idx + 1]);
+                debug!("RECV_META_CLR({:02x?})", &tag.as_ref()[in_idx..in_idx + 1]);
                 strobe.meta_recv_clr(&tag.as_mut()[in_idx..in_idx + 1], more);
             }
 
@@ -265,13 +300,35 @@ where
 
             // try to parse the tag from the bytes received so far...
             if tag.try_parse(in_idx) {
-                //if is_keyed {
-                //    println!("RECV_META_ENC:\n\tCT: {:02x?}", &debug_buf[..in_idx]);
-                //    println!("\tPT: {:02x?}", &tag.as_mut()[..in_idx]);
-                //} else {
-                //    println!("RECV_META_CLR({:02x?})", &tag.as_ref()[..in_idx]);
-                //}
-                return Ok(in_idx);
+                if is_keyed {
+                    debug!("RECV_META_ENC:\n\tCT: {:02x?}", &in_buf[in_offset..in_idx]);
+                    debug!("\tPT: {:02x?}", &tag.as_mut()[..in_idx]);
+                } else {
+                    debug!("RECV_META_CLR({:02x?})", &tag.as_ref()[..in_idx]);
+                }
+
+                // make sure we're not going to read beyond the end of the buffer
+                let mac_start = in_offset + in_idx;
+                let mac_end = mac_start + MSG_MAC_LEN;
+                if mac_end > in_buf.len() {
+                    return Err(ProtocolError::InvalidBufferLen.into());
+                }
+
+                // copy the mac
+                let mut mac_buf = [0u8; MSG_MAC_LEN];
+                mac_buf.copy_from_slice(&in_buf[mac_start..mac_end]);
+
+                // make this composite
+                strobe.meta_ad(&MSG_MAC_LEN.to_ne_bytes(), false);
+                debug!("META_AD({:02x?})", &MSG_MAC_LEN.to_ne_bytes());
+
+                // read and check the mac
+                debug!("RECV_META_MAC({:02x?})", mac_buf);
+                strobe
+                    .meta_recv_mac(&mut mac_buf)
+                    .map_err(|_| ProtocolError::InvalidMac)?;
+
+                return Ok(in_idx + MSG_MAC_LEN);
             }
         }
     }
@@ -306,25 +363,28 @@ where
         out_buf[..data_len].copy_from_slice(&in_buf[in_idx..in_idx + data_len]);
 
         // if keyed then recv_enc and recv_mac otherwize recv_clr
-        let mut mac_buf = [0u8; 16];
+        let mut mac_buf = [0u8; MSG_MAC_LEN];
+        // make this a composite operation by meta_AD the expected data length first
+        strobe.meta_ad(&data_len.to_ne_bytes(), false);
+        debug!("META_AD({:02x?})", &data_len.to_ne_bytes());
         in_idx += if is_keyed {
             // recv and decrypt the data
-            //println!("RECV_ENC:\n\tCT: {:02x?}", &out_buf[..data_len]);
+            debug!("RECV_ENC:\n\tCT: {:02x?}", &out_buf[..data_len]);
             strobe.recv_enc(&mut out_buf[..data_len], false);
-            //println!("\tPT: {:02x?}", &out_buf[..data_len]);
-            // check the mac
-            //println!(
-            //    "RECV_MAC({:02x?})",
-            //    &in_buf[in_idx + data_len..in_idx + data_len + 16]
-            //);
+            debug!("\tPT: {:02x?}", &out_buf[..data_len]);
+            // make this a composite operation
+            strobe.meta_ad(&MSG_MAC_LEN.to_ne_bytes(), false);
+            debug!("META_AD({:02x?})", &MSG_MAC_LEN.to_ne_bytes());
+            // then receive the mac
             mac_buf.copy_from_slice(&in_buf[in_idx + data_len..in_idx + data_len + 16]);
+            debug!("RECV_MAC({:02x?})", mac_buf);
             strobe
                 .recv_mac(&mut mac_buf)
                 .map_err(|_| ProtocolError::InvalidMac)?;
             data_len + 16
         } else {
             // recv the data in the clear
-            //println!("RECV_CLR({:02x?})", &out_buf[..data_len]);
+            debug!("RECV_CLR({:02x?})", &out_buf[..data_len]);
             strobe.recv_clr(&out_buf[..data_len], false);
             data_len
         };
@@ -336,7 +396,7 @@ where
     // this uses the AD operation to mix data bytes into the given strobe state
     fn strobe_ad(strobe: &mut Strobe, data: &[u8]) {
         // update the strobe state with the data bytes
-        //println!("MIX AD({:02x?})", &data.as_ref()[0..len]);
+        debug!("MIX AD({:02x?})", data);
         if data.len() > 0 {
             strobe.ad(data, false);
         }
@@ -345,7 +405,7 @@ where
     // this uses the KEY operation to rekey with the data bytes
     fn strobe_key(strobe: &mut Strobe, data: &[u8]) {
         // update the strobe state with the data bytes
-        //println!("MIX KEY({:02x?})", &data.as_ref()[0..len]);
+        debug!("MIX KEY({:02x?})", data);
         if data.len() > 0 {
             strobe.key(data, false);
         }
@@ -365,6 +425,8 @@ where
         out_offset: usize,
     ) -> Result<usize> {
         out_buf[out_offset..out_offset + 32].copy_from_slice(&prf[..32]);
+        // composite operation by meta_ad + send_clr
+        strobe.meta_ad(&32_usize.to_ne_bytes(), false);
         strobe.send_clr(&out_buf[out_offset..out_offset + 32], false);
         Ok(32)
     }
@@ -385,6 +447,8 @@ where
         prf: &mut [u8; 32],
     ) -> Result<(usize, usize)> {
         prf[..32].copy_from_slice(&in_buf[in_offset..in_offset + 32]);
+        // composite operation by meta_ad + recv_clr
+        strobe.meta_ad(&32_usize.to_ne_bytes(), false);
         strobe.recv_clr(&prf[..32], false);
         Ok((32, 32))
     }
@@ -401,7 +465,7 @@ where
 
         // check if it is time to rekey and rekey the strobe state
         if *since_rekey >= rekey_in {
-            //println!("REKEYING NOW!! AFTER {} MSGS", rekey_in);
+            debug!("REKEYING NOW!! AFTER {} MSGS", rekey_in);
             strobe.ratchet(16, false);
 
             // reset the counter
@@ -420,7 +484,7 @@ where
     // Extension specification (https://discocrypto.com/disco.html)
     fn split(
         strobe: &mut Strobe,
-        params: &Params<K, T, N, P, S, SS>,
+        params: &Params<K, T, P, S, SS>,
         nonces: &NG,
         initiator: bool,
         out_of_order: bool,
@@ -549,6 +613,7 @@ where
                 re,
                 psk,
                 ref mut prf,
+                ..
             } => {
                 use HandshakeData::*;
                 use HandshakeOp::*;
@@ -671,7 +736,7 @@ where
                                     Epub => ep.as_ref(),
                                     Esec => es.as_ref(),
                                     Payload => {
-                                        //println!("READ {} BYTES FROM IN_BUF", in_buf.len());
+                                        debug!("READ {} BYTES FROM IN_BUF", in_buf.len());
                                         in_buf
                                     }
                                     Prologue => {
@@ -820,14 +885,14 @@ where
                                     },
                                     match d {
                                         Payload => {
-                                            //println!("READ {} BYTES FROM IN_BUF", in_buf.len());
+                                            debug!("READ {} BYTES FROM IN_BUF", in_buf.len());
                                             in_buf
                                         }
                                         Nonce => {
-                                            //println!(
-                                            //    "READ {} BYTES FROM NONCE",
-                                            //    nonce.as_ref().len()
-                                            //);
+                                            debug!(
+                                                "READ {} BYTES FROM NONCE",
+                                                nonce.as_ref().len()
+                                            );
                                             nonce.as_ref()
                                         }
                                         _ => return Err(ProtocolError::SendingPrf.into()),
@@ -855,6 +920,9 @@ where
 
                                 // if we're in-order then update the channel state
                                 if !*out_of_order {
+                                    // do a composite operation by meta_AD the length of the PRF
+                                    msg_strobe.meta_ad(&out_prf.len().to_ne_bytes(), false);
+                                    // followed by the PRF
                                     msg_strobe.prf(out_prf, false);
                                 }
                                 return Ok(out_idx);
@@ -903,6 +971,7 @@ where
                 ref mut re,
                 psk,
                 ref mut prf,
+                ..
             } => {
                 use HandshakeData::*;
                 use HandshakeOp::*;
@@ -1044,7 +1113,7 @@ where
                                     Spub => sp.set_tag(&tag),
                                     Ssec => ss.set_tag(&tag),
                                     Payload => {
-                                        //println!("WROTE {} BYTES TO OUT_BUF", o);
+                                        debug!("WROTE {} BYTES TO OUT_BUF", o);
                                         out_idx += o;
                                     } // update the out_buf index
                                     _ => {}
@@ -1140,7 +1209,7 @@ where
 
                             // check the nonce value with the nonce generator to ensure it is valid
                             CheckNonce => {
-                                //println!("CHECKING NONCE: {:02x?}", nonce.as_ref());
+                                debug!("CHECKING NONCE: {:02x?}", nonce.as_ref());
                                 if !in_nonces.check_add(&nonce) {
                                     return Err(ProtocolError::InvalidNonce.into());
                                 }
@@ -1202,11 +1271,11 @@ where
                                 // set the decoded tag
                                 match d {
                                     Nonce => {
-                                        //println!("WROTE {} BYTES TO NONCE", o);
+                                        debug!("WROTE {} BYTES TO NONCE", o);
                                         nonce.set_tag(&tag)
                                     }
                                     Payload => {
-                                        //println!("WROTE {} BYTES TO OUTBUF", o);
+                                        debug!("WROTE {} BYTES TO OUTBUF", o);
                                         out_idx += o;
                                     }
                                     _ => {}
@@ -1228,6 +1297,9 @@ where
 
                                 // if we're in-order, update the channel state after every message
                                 if !*out_of_order {
+                                    // do a composite operation by meta_AD the length of the PRF
+                                    msg_strobe.meta_ad(&in_prf.len().to_ne_bytes(), false);
+                                    // followed by the PRF
                                     msg_strobe.prf(in_prf, false);
                                 }
                                 return Ok((in_idx, out_idx));
@@ -1296,6 +1368,8 @@ where
             _ => Err(ProtocolError::InvalidState.into()),
         }
     }
+
+    /// Get a specified number of pseudo-random numbers derived from the channel state
 
     /// True if in the handshake state
     pub fn is_handshaking(&self) -> bool {

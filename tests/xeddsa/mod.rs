@@ -25,7 +25,7 @@ use serde_big_array::BigArray;
 use zeroize::Zeroize;
 
 pub type DiscoParams =
-    Params<DiscoXeddsa, DiscoTag, DiscoNonce, DiscoPublicKey, DiscoSecretKey, DiscoSharedSecret>;
+    Params<DiscoXeddsa, DiscoTag, DiscoPublicKey, DiscoSecretKey, DiscoSharedSecret>;
 pub type DiscoSession = Session<
     DiscoXeddsa,
     DiscoNonceGenerator,

@@ -29,7 +29,7 @@ where
     SS: TaggedData<T>,
 {
     /// Disco params
-    params: Params<K, T, N, P, S, SS>,
+    params: Params<K, T, P, S, SS>,
     /// Nonce generator
     nonces: NG,
     /// Protocol prologue
@@ -52,6 +52,7 @@ where
     rekey_in: u64,
     // phantom marker
     _t: PhantomData<T>,
+    _n: PhantomData<N>,
 }
 
 impl<K, NG, PG, T, N, P, S, SS> Builder<K, NG, PG, T, N, P, S, SS>
@@ -66,7 +67,7 @@ where
     SS: TaggedData<T>,
 {
     /// Construct a new builder from DiscoParams
-    pub fn new(params: &Params<K, T, N, P, S, SS>, nonces: &NG) -> Self {
+    pub fn new(params: &Params<K, T, P, S, SS>, nonces: &NG) -> Self {
         Builder {
             params: params.clone(),
             nonces: nonces.clone(),
@@ -80,6 +81,7 @@ where
             out_of_order: false,
             rekey_in: u64::max_value() - 1,
             _t: PhantomData,
+            _n: PhantomData,
         }
     }
 
@@ -193,6 +195,7 @@ where
             re: P::default(),
             psk: self.pre_shared_key,
             prf: [0u8; 32],
+            _n: PhantomData,
         })
     }
 }

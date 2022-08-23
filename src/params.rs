@@ -19,11 +19,10 @@ use strobe_rs::STROBE_VERSION;
 
 /// Encapsulates the handshake parameters
 #[derive(PartialEq, Clone, Debug, Serialize, Deserialize)]
-pub struct Params<K, T, N, P, S, SS>
+pub struct Params<K, T, P, S, SS>
 where
     K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
     T: Tag,
-    N: TaggedData<T>,
     P: TaggedData<T>,
     S: TaggedData<T>,
     SS: TaggedData<T>,
@@ -38,17 +37,15 @@ where
     pub version: StrobeVersion,
     // phantom markers
     _t: PhantomData<T>,
-    _n: PhantomData<N>,
     _p: PhantomData<P>,
     _s: PhantomData<S>,
     _ss: PhantomData<SS>,
 }
 
-impl<K, T, N, P, S, SS> FromStr for Params<K, T, N, P, S, SS>
+impl<K, T, P, S, SS> FromStr for Params<K, T, P, S, SS>
 where
     K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
     T: Tag,
-    N: TaggedData<T>,
     P: TaggedData<T>,
     S: TaggedData<T>,
     SS: TaggedData<T>,
@@ -67,7 +64,6 @@ where
                 .map_err(|_| ParamError::InvalidKeyType)?,
             version: split.next().ok_or(ParamError::TooFewParameters)?.parse()?,
             _t: PhantomData,
-            _n: PhantomData,
             _p: PhantomData,
             _s: PhantomData,
             _ss: PhantomData,
@@ -75,11 +71,10 @@ where
     }
 }
 
-impl<K, T, N, P, S, SS> Display for Params<K, T, N, P, S, SS>
+impl<K, T, P, S, SS> Display for Params<K, T, P, S, SS>
 where
     K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
     T: Tag,
-    N: TaggedData<T>,
     P: TaggedData<T>,
     S: TaggedData<T>,
     SS: TaggedData<T>,
