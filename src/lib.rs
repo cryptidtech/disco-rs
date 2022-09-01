@@ -23,6 +23,8 @@ extern crate std;
 
 /// Disco session builder
 pub mod builder;
+/// Disco channel
+pub mod channel;
 /// Disco errors
 pub mod error;
 /// Disco handshake

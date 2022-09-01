@@ -1,6 +1,6 @@
 [package]
 name = "disco-rs"
-version = "0.5.1"
+version = "0.6.0"
 authors = ["Dave Huseby <dave@cryptid.tech>"]
 description = "A no-std, pure Rust impl of Disco Noise Protocol extension"
 documentation = "https://docs.rs/disco-rs"
@@ -38,18 +38,19 @@ no-std = [
 [dependencies]
 anyhow = { version = "1.0", default-features = false }
 cde = { version = "0.3", default-features = false }
+heapless = { version = "0.7", default-features = false, features = ["serde"] }
 log = { version = "0.4", default-features = false }
 rand_core = "0.6"
 rand_core5 = { version = "0.5", package = "rand_core" }
-rand = { version = "0.8", default-features = false, optional = true }
+rand = { version = "0.8", default-features = false, features = ["serde1"], optional = true }
 rand_xorshift = { version = "0.3", optional = true }
-rand_chacha = "0.3"
+rand_chacha = { version = "0.3", default-features = false, features = ["serde1"], optional = true }
 semver = { version = "1.0", default-features = false, features = ["serde"] }
 serde = { version = "1.0", default-features = false, features = ["derive"] }
 serde-big-array = { version = "0.4.1", default-features = false }
 strobe-rs = { version = "0.7", default-features = false, features = ["serialize_secret_state"] }
 thiserror = { version = "1.0", default-features = false }
-zeroize = "1.4"
+zeroize = "1.3"
 
 [dev-dependencies]
 cde = { version = "0.3" }
@@ -57,5 +58,6 @@ elliptic-curve = { version = "0.10", features = ["ecdh"] }
 rand = "0.8"
 rand7 = { version = "0.7", package = "rand" }
 rand_xorshift = "0.3"
+rand_chacha = { version = "0.3", features = ["serde1"] }
 serde_cbor = "0.11.2"
-x25519-dalek = { version = "1.1" }
+x25519-dalek = { version = "1.2", features = ["serde"] }

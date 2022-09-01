@@ -28,6 +28,6 @@ pub trait Tag: AsRef<[u8]> + AsMut<[u8]> + Clone + Default {
 pub trait TaggedData<T: Tag>: AsRef<[u8]> + AsMut<[u8]> + Clone + Default {
     /// Get the tag
     fn get_tag(&self) -> &T;
-    /// Set the tag
-    fn set_tag(&mut self, tag: &T);
+    /// Get a mutable reference to the tag
+    fn get_tag_mut(&mut self) -> &mut T;
 }

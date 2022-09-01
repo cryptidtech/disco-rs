@@ -2,7 +2,11 @@
     Copyright David Huseby, All Rights Reserved.
     SPDX-License-Identifier: Apache-2.0
 */
-use crate::error::{Error, ParamError};
+use crate::{
+    channel::{ChannelDuplex, ChannelRole, ChannelState},
+    error::{Error, ParamError},
+    Result,
+};
 use core::{
     fmt::{Display, Error as FmtError, Formatter},
     str::FromStr,
@@ -36,6 +40,8 @@ pub enum HandshakeData {
 /// https://www.discocrypto.com/disco.html
 #[derive(PartialEq, Copy, Clone, Debug, Deserialize, Serialize)]
 pub enum HandshakeOp {
+    /// Start a message
+    Start,
     /// Generate a new key pair
     GenKey,
     /// Get the handshake hash
@@ -57,22 +63,45 @@ pub enum HandshakeOp {
 }
 
 /// The state of the handshake so that this is resumable
-#[derive(PartialEq, Copy, Clone, Debug, Deserialize, Serialize)]
+#[derive(PartialEq, Clone, Debug, Deserialize, Serialize)]
 pub struct HandshakeState {
+    /// The handshake operations
     handshake: Handshake,
-    initiator: bool,
+    /// The index to the next handshake operation
     index: usize,
+    /// The channel role
+    role: ChannelRole,
+    /// The channel duplex mode
+    duplex: ChannelDuplex,
 }
 
 /// HandshakeState impl
 impl HandshakeState {
     /// construct a new handshake state from a list of operations
-    pub fn new(pattern: Handshake, initiator: bool) -> Self {
+    pub fn new(pattern: Handshake, role: &ChannelRole, duplex: &ChannelDuplex) -> Self {
         HandshakeState {
             handshake: pattern,
-            initiator,
             index: 0,
+            role: role.clone(),
+            duplex: duplex.clone(),
         }
+    }
+}
+
+/// ChannelState trait impl
+impl ChannelState for HandshakeState {
+    /// get the channel role
+    fn role(&self) -> &ChannelRole {
+        &self.role
+    }
+    /// get the channel duplex
+    fn duplex(&self) -> &ChannelDuplex {
+        &self.duplex
+    }
+    /// reset the channel state
+    fn reset(&mut self) -> Result<()> {
+        self.index = 0;
+        Ok(())
     }
 }
 
@@ -81,7 +110,7 @@ impl Iterator for HandshakeState {
     type Item = HandshakeOp;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let pattern = self.handshake.get_pattern(self.initiator);
+        let pattern = self.handshake.get_pattern(&self.role);
         if self.index < pattern.len() {
             let op = pattern[self.index];
             self.index += 1;
@@ -157,33 +186,10 @@ pub enum Handshake {
 // is its responder state and their inbound state is its initiator state. calls
 // RATCHET(16) on both states. returns both states.
 //
-// NOTE: every strobe operation is encoded using CDE (https://github.com/cryptidtech/cde)
-// and either streamed as text or binary based on the applications requirments.
-// each primitive strobe operation has its own tag that can consist of either
-// 1, 2, or 3, three-byte "triples". each tag is sent by calling MixHash()
-// followed by SendAndHash() for each of the three-byte triples. the result is
-// outputing a tag that determins the primitive strobe operation and the length
-// of the data to process with the operation. to receive a tag, the receiver
-// first calls MixHash() followed by RecvAndHash() for the first three-byte
-// triple. If the MSB of the third byte in the triple is set then the length
-// of the associated data is greater than 127 bytes in length a second three-
-// byte triple must be received. the receiver again calls MixHash() and
-// RecvAndHash() to get the second three-byte triple. Again, if the MSB of the
-// third by is set, then there is a third three-byte triple and again the
-// receiver calls MixHash() and RecvAndHash() to receive the third three-byte
-// triple. The strobe operation is encoded in the class and sub-class values
-// in the first and second bytes of the first three-byte triple. The length of
-// the associated data is encoded as an unsigned varint
-// (https://github.com/multiformats/unsigned-varint) of up to seven bytes in
-// length giving a maximum payload length of 2^49-1 bytes. once the primitive
-// strobe operation is known, it must be performed on the associated data with
-// the length given in the tag.
-//
-//
-
 impl Handshake {
     /// Return the appropriate HandshakeState
-    pub fn get_pattern(&self, initiator: bool) -> &[HandshakeOp] {
+    pub fn get_pattern(&self, role: &ChannelRole) -> &[HandshakeOp] {
+        use ChannelRole::*;
         use HandshakeData::*;
         use HandshakeOp::*;
 
@@ -226,9 +232,10 @@ impl Handshake {
             //                                      | payload = DecryptAndHash()
             //                                      | Split()
             Handshake::N => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         /* send */
@@ -238,10 +245,10 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         /* recv */
@@ -250,7 +257,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // K_Strobe Session Setup
@@ -293,9 +300,10 @@ impl Handshake {
             //                                      | payload = DecryptAndHash()
             //                                      | Split()
             Handshake::K => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         MixHash(Rs),
@@ -307,10 +315,10 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         MixHash(Spub),
@@ -321,7 +329,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // X_Strobe Session Setup
@@ -365,9 +373,10 @@ impl Handshake {
             //                                      | payload = DecryptAndHash()
             //                                      | split()
             Handshake::X => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         /* send */
@@ -379,10 +388,10 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         /* recv */
@@ -393,7 +402,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // Npsk0_Strobe Session Setup
@@ -435,9 +444,10 @@ impl Handshake {
             //                                      | payload = DecryptAndHash()
             //                                      | Split()
             Handshake::Npsk0 => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         /* send */
@@ -448,10 +458,10 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         /* recv */
@@ -461,7 +471,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // Kpsk0_Strobe Session Setup
@@ -505,9 +515,10 @@ impl Handshake {
             //                                      | payload = DecryptAndHash()
             //                                      | Split()
             Handshake::Kpsk0 => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         MixHash(Rs),
@@ -520,10 +531,10 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         MixHash(Spub),
@@ -535,7 +546,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // Xpsk1_Strobe Session Setup
@@ -580,9 +591,10 @@ impl Handshake {
             //                                      | payload = DecryptAndHash()
             //                                      | split()
             Handshake::Xpsk1 => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         /* send */
@@ -595,10 +607,10 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         /* recv */
@@ -610,7 +622,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // NN_Strobe Session Setup
@@ -654,9 +666,10 @@ impl Handshake {
             // | Split()
             //
             Handshake::NN => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* send */
                         GenKey,
@@ -664,28 +677,30 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* recv */
                         DecryptAndHash(Re),
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // KK_Strobe Session Setup
@@ -740,9 +755,10 @@ impl Handshake {
             // | payload = DecryptAndHash()
             // | Split()
             Handshake::KK => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         MixHash(Rs),
@@ -754,16 +770,17 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         MixKeyDh(Esec, Rs),
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         MixHash(Spub),
@@ -774,6 +791,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
@@ -781,7 +799,7 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // XX_Strobe Session Setup
@@ -844,9 +862,10 @@ impl Handshake {
             //                                      | payload = DecryptAndHash()
             //                                      | Split()
             Handshake::XX => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* send */
                         GenKey,
@@ -854,6 +873,7 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         DecryptAndHash(Rs),
@@ -861,21 +881,23 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         EncryptAndHash(Spub),
                         MixKeyDh(Ssec, Rs),
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* recv */
                         DecryptAndHash(Re),
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
@@ -884,12 +906,13 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Rs),
                         MixKeyDh(Ssec, Rs),
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // IK_Strobe Session Setup
@@ -945,9 +968,10 @@ impl Handshake {
             // | Split()
             //
             Handshake::IK => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         /* send */
@@ -959,16 +983,17 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         MixKeyDh(Esec, Rs),
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         /* recv */
@@ -979,6 +1004,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
@@ -986,7 +1012,7 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // IX_Strobe Session Setup
@@ -1038,9 +1064,10 @@ impl Handshake {
             // | Split()
             //
             Handshake::IX => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* send */
                         GenKey,
@@ -1049,6 +1076,7 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         MixKeyDh(Ssec, Re),
@@ -1057,10 +1085,10 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* recv */
                         DecryptAndHash(Re),
@@ -1068,6 +1096,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
@@ -1077,7 +1106,7 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // NK_Strobe Session Setup
@@ -1127,9 +1156,10 @@ impl Handshake {
             // | Split()
             //
             Handshake::NK => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         /* send */
@@ -1139,15 +1169,16 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         /* recv */
@@ -1156,13 +1187,14 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // NX_Strobe Session Setup
@@ -1210,9 +1242,10 @@ impl Handshake {
             // | Split()
             //
             Handshake::NX => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* send */
                         GenKey,
@@ -1220,6 +1253,7 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         DecryptAndHash(Rs),
@@ -1227,16 +1261,17 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* recv */
                         DecryptAndHash(Re),
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
@@ -1245,7 +1280,7 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // XK1_Strobe Session Setup
@@ -1307,9 +1342,10 @@ impl Handshake {
             //                                      | Split()
             //
             Handshake::XK1 => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         /* send */
@@ -1318,21 +1354,23 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         MixKeyDh(Esec, Rs),
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         EncryptAndHash(Spub),
                         MixKeyDh(Ssec, Re),
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         /* recv */
@@ -1340,6 +1378,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
@@ -1347,12 +1386,13 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Rs),
                         MixKeyDh(Esec, Rs),
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // KK1_Strobe Session Setup
@@ -1406,9 +1446,10 @@ impl Handshake {
             // | Split()
             //
             Handshake::KK1 => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Spub),
                         MixHash(Rs),
@@ -1418,6 +1459,7 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         MixKeyDh(Esec, Rs),
@@ -1425,10 +1467,10 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         MixHash(Rs),
                         MixHash(Spub),
@@ -1437,6 +1479,7 @@ impl Handshake {
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
@@ -1445,7 +1488,7 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
             // NNpsk2_Strobe Session Setup
@@ -1492,9 +1535,10 @@ impl Handshake {
             // | Split()
             //
             Handshake::NNpsk2 => {
-                if initiator {
-                    &[
+                match role {
+                    Initiator => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* send */
                         GenKey,
@@ -1502,22 +1546,24 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         Stop,
                         /* recv */
+                        Start,
                         DecryptAndHash(Re),
                         MixKeyDh(Esec, Re),
                         MixKey(Psk),
                         DecryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
-                } else {
-                    &[
+                    ],
+                    Responder => &[
                         /* init */
+                        Start,
                         MixHash(Prologue),
                         /* recv */
                         DecryptAndHash(Re),
                         DecryptAndHash(Payload),
                         Stop,
                         /* send */
+                        Start,
                         GenKey,
                         EncryptAndHash(Epub),
                         MixKeyDh(Esec, Re),
@@ -1525,78 +1571,78 @@ impl Handshake {
                         EncryptAndHash(Payload),
                         GetHandshakeHash,
                         Split,
-                    ]
+                    ],
                 }
             }
         }
     }
 
     /// True if handshake pattern requires local static key
-    pub fn needs_local_static_key(&self, initiator: bool) -> bool {
+    pub fn needs_local_static_key(&self, role: &ChannelRole) -> bool {
+        use ChannelRole::*;
         use Handshake::*;
-        if initiator {
-            match self {
+        match role {
+            Initiator => match self {
                 N | Npsk0 | NN | NK | NX | NNpsk2 => false,
                 K | X | Kpsk0 | Xpsk1 | KK | XX | IK | IX | XK1 | KK1 => true,
-            }
-        } else {
-            match self {
+            },
+            Responder => match self {
                 N | Npsk0 | NN | NNpsk2 => false,
                 K | X | Kpsk0 | Xpsk1 | KK | XX | IK | IX | NK | NX | XK1 | KK1 => true,
-            }
+            },
         }
     }
 
     /// True if handshake pattern requires remote static public key before the handshake
-    pub fn needs_remote_static_key(&self, initiator: bool) -> bool {
+    pub fn needs_remote_static_key(&self, role: &ChannelRole) -> bool {
+        use ChannelRole::*;
         use Handshake::*;
-        if initiator {
-            match self {
+        match role {
+            Initiator => match self {
                 N | K | X | Npsk0 | Kpsk0 | Xpsk1 | KK | IK | NK | XK1 | KK1 => true,
                 IX | NN | XX | NX | NNpsk2 => false,
-            }
-        } else {
-            match self {
+            },
+            Responder => match self {
                 K | Kpsk0 | KK | KK1 => true,
                 N | X | Npsk0 | Xpsk1 | NN | XX | IK | IX | NK | NX | XK1 | NNpsk2 => false,
-            }
+            },
         }
     }
 
     /// True if the handshake pattern and my role requires me to mix my static pub key
-    pub fn mix_local_static_key(&self, initiator: bool) -> bool {
+    pub fn mix_local_static_key(&self, role: &ChannelRole) -> bool {
+        use ChannelRole::*;
         use Handshake::*;
-        if initiator {
-            match self {
+        match role {
+            Initiator => match self {
                 K | Kpsk0 | KK | KK1 => true,
                 N | X | Npsk0 | Xpsk1 | NN | XX | IK | IX | NK | NX | XK1 | NNpsk2 => false,
-            }
-        } else {
-            match self {
+            },
+            Responder => match self {
                 N | K | X | Npsk0 | Kpsk0 | Xpsk1 | KK | IK | NK | XK1 | KK1 => true,
                 NN | XX | IX | NX | NNpsk2 => false,
-            }
+            },
         }
     }
 
     /// True if the handshake pattern and my role requires me to mix the remote static pub key
-    pub fn mix_remote_static_key(&self, initiator: bool) -> bool {
+    pub fn mix_remote_static_key(&self, role: &ChannelRole) -> bool {
+        use ChannelRole::*;
         use Handshake::*;
-        if initiator {
-            match self {
+        match role {
+            Initiator => match self {
                 N | K | X | Npsk0 | Kpsk0 | Xpsk1 | KK | IK | NK | XK1 | KK1 => true,
                 NN | XX | IX | NX | NNpsk2 => false,
-            }
-        } else {
-            match self {
+            },
+            Responder => match self {
                 K | Kpsk0 | KK | KK1 => true,
                 N | X | Npsk0 | Xpsk1 | NN | XX | IK | IX | NK | NX | XK1 | NNpsk2 => false,
-            }
+            },
         }
     }
 
     /// True if the handshake pattern requires a pre-shared key before the handshake
-    pub fn needs_pre_shared_key(&self, _initiator: bool) -> bool {
+    pub fn needs_pre_shared_key(&self, _role: &ChannelRole) -> bool {
         use Handshake::*;
         match self {
             Npsk0 | Kpsk0 | Xpsk1 | NNpsk2 => true,
@@ -1605,32 +1651,32 @@ impl Handshake {
     }
 
     /// True if handshake pattern defers the local DH operation
-    pub fn local_dh_is_deferred(&self, initiator: bool) -> bool {
+    pub fn local_dh_is_deferred(&self, role: &ChannelRole) -> bool {
+        use ChannelRole::*;
         use Handshake::*;
-        if initiator {
-            false
-        } else {
-            match self {
+        match role {
+            Initiator => false,
+            Responder => match self {
                 N | K | X | Npsk0 | Kpsk0 | Xpsk1 | NN | KK | XX | IK | IX | NK | NX | NNpsk2 => {
                     false
                 }
                 XK1 | KK1 => true,
-            }
+            },
         }
     }
 
     /// True if handshake pattern defers the remote DH operation
-    pub fn remote_dh_is_deferred(&self, initiator: bool) -> bool {
+    pub fn remote_dh_is_deferred(&self, role: &ChannelRole) -> bool {
+        use ChannelRole::*;
         use Handshake::*;
-        if initiator {
-            match self {
+        match role {
+            Initiator => match self {
                 N | K | X | Npsk0 | Kpsk0 | Xpsk1 | NN | KK | XX | IK | IX | NK | NX | NNpsk2 => {
                     false
                 }
                 XK1 | KK1 => true,
-            }
-        } else {
-            false
+            },
+            Responder => false,
         }
     }
 }
@@ -1638,7 +1684,7 @@ impl Handshake {
 impl FromStr for Handshake {
     type Err = Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
+    fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
         use self::Handshake::*;
         match s {
             "N" => Ok(N),
@@ -1663,7 +1709,7 @@ impl FromStr for Handshake {
 }
 
 impl Display for Handshake {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), FmtError> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::result::Result<(), FmtError> {
         use self::Handshake::*;
         match self {
             N => write!(f, "N"),

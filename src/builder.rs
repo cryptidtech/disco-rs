@@ -3,6 +3,7 @@
     SPDX-License-Identifier: Apache-2.0
 */
 use crate::{
+    channel::{Channel, ChannelDuplex, ChannelRole},
     error::{BuilderError, Error},
     handshake::HandshakeState,
     key::{KeyAgreement, KeyGenerator, KeyType},
@@ -11,17 +12,18 @@ use crate::{
     prologue::Prologue,
     session::Session,
     tag::{Tag, TaggedData},
+    transport::TransportOrder,
 };
 use core::marker::PhantomData;
 use strobe_rs::{SecParam, Strobe};
 
 /// Generates a [`HandshakeState`] and also validates that all of the
 /// prerequisites for the given parameters are satisfied.
-pub struct Builder<K, NG, PG, T, N, P, S, SS>
+pub struct Builder<K, PG, NG, T, N, P, S, SS>
 where
     K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
-    NG: NonceGenerator<T, N>,
     PG: Prologue,
+    NG: NonceGenerator<T, N>,
     T: Tag,
     N: TaggedData<T>,
     P: TaggedData<T>,
@@ -30,10 +32,10 @@ where
 {
     /// Disco params
     params: Params<K, T, P, S, SS>,
-    /// Nonce generator
-    nonces: NG,
     /// Protocol prologue
     prologue: PG,
+    /// Nonce generator
+    nonce_generator: NG,
     /// Local static secret key
     local_static_secret_key: S,
     /// Local static public key
@@ -46,20 +48,18 @@ where
     remote_static_public_key: P,
     /// Pre-shared key
     pre_shared_key: SS,
-    /// Out of order delivery
-    out_of_order: bool,
-    /// Re-key threshold
-    rekey_in: u64,
+    /// Message delivery order
+    msg_order: TransportOrder,
     // phantom marker
     _t: PhantomData<T>,
     _n: PhantomData<N>,
 }
 
-impl<K, NG, PG, T, N, P, S, SS> Builder<K, NG, PG, T, N, P, S, SS>
+impl<K, PG, NG, T, N, P, S, SS> Builder<K, PG, NG, T, N, P, S, SS>
 where
     K: KeyType + KeyGenerator<T, P, S> + KeyAgreement<T, P, S, SS>,
-    NG: NonceGenerator<T, N>,
     PG: Prologue,
+    NG: NonceGenerator<T, N>,
     T: Tag,
     N: TaggedData<T>,
     P: TaggedData<T>,
@@ -67,19 +67,18 @@ where
     SS: TaggedData<T>,
 {
     /// Construct a new builder from DiscoParams
-    pub fn new(params: &Params<K, T, P, S, SS>, nonces: &NG) -> Self {
+    pub fn new(params: &Params<K, T, P, S, SS>, nonce_generator: &NG) -> Self {
         Builder {
             params: params.clone(),
-            nonces: nonces.clone(),
             prologue: PG::default(),
+            nonce_generator: nonce_generator.clone(),
             local_static_secret_key: S::default(),
             local_static_public_key: P::default(),
             local_ephemeral_secret_key: S::default(),
             local_ephemeral_public_key: P::default(),
             remote_static_public_key: P::default(),
             pre_shared_key: SS::default(),
-            out_of_order: false,
-            rekey_in: u64::max_value() - 1,
+            msg_order: TransportOrder::InOrder,
             _t: PhantomData,
             _n: PhantomData,
         }
@@ -128,43 +127,37 @@ where
     }
 
     /// Create strobe states that can handle out-of-order messages
-    pub fn out_of_order(mut self, ooo: bool) -> Self {
-        self.out_of_order = ooo;
-        self
-    }
-
-    /// Set the number of messages to send before re-key occurs
-    pub fn rekey_in(mut self, num: u64) -> Self {
-        self.rekey_in = num;
+    pub fn msg_order(mut self, order: &TransportOrder) -> Self {
+        self.msg_order = *order;
         self
     }
 
     /// Build an initiator disco session
-    pub fn build_initiator(self) -> Result<Session<K, NG, PG, T, N, P, S, SS>, Error> {
-        self.build(true)
+    pub fn build_initiator(self) -> Result<Session<K, PG, NG, T, N, P, S, SS>, Error> {
+        self.build(&ChannelRole::Initiator)
     }
 
     /// Build a responder disco session
-    pub fn build_responder(self) -> Result<Session<K, NG, PG, T, N, P, S, SS>, Error> {
-        self.build(false)
+    pub fn build_responder(self) -> Result<Session<K, PG, NG, T, N, P, S, SS>, Error> {
+        self.build(&ChannelRole::Responder)
     }
 
     /// Construct the disco session
-    pub fn build(self, initiator: bool) -> Result<Session<K, NG, PG, T, N, P, S, SS>, Error> {
+    pub fn build(self, role: &ChannelRole) -> Result<Session<K, PG, NG, T, N, P, S, SS>, Error> {
         if self.local_static_secret_key.get_tag().get_data_length() == 0
-            && self.params.handshake.needs_local_static_key(initiator)
+            && self.params.handshake.needs_local_static_key(role)
         {
             return Err(Error::Builder(BuilderError::MissingLocalSecretKey));
         }
 
         if self.remote_static_public_key.get_tag().get_data_length() == 0
-            && self.params.handshake.needs_remote_static_key(initiator)
+            && self.params.handshake.needs_remote_static_key(role)
         {
             return Err(Error::Builder(BuilderError::MissingRemotePublicKey));
         }
 
         if self.pre_shared_key.get_tag().get_data_length() == 0
-            && self.params.handshake.needs_pre_shared_key(initiator)
+            && self.params.handshake.needs_pre_shared_key(role)
         {
             return Err(Error::Builder(BuilderError::MissingPreSharedKey));
         }
@@ -173,19 +166,14 @@ where
         let strobe = Strobe::new(format!("{}", self.params).as_bytes(), SecParam::B256);
 
         // create our handshake state
-        let hs = HandshakeState::new(self.params.handshake, initiator);
+        let hs = HandshakeState::new(self.params.handshake, role, &ChannelDuplex::Full);
+
+        // create our channel
+        let channel = Channel::new(&strobe, &hs, &self.nonce_generator, self.msg_order, false);
 
         Ok(Session::Handshake {
-            strobe,
             params: self.params,
-            nonces: self.nonces,
-            handshake_state: hs,
-            initiator,
-            out_of_order: self.out_of_order,
-            rekey_in: self.rekey_in,
-            msgs_since_rekey: 0,
-            msgs_total: 0,
-            is_keyed: false,
+            channel,
             prologue: self.prologue,
             sp: self.local_static_public_key,
             ss: self.local_static_secret_key,
@@ -195,7 +183,6 @@ where
             re: P::default(),
             psk: self.pre_shared_key,
             prf: [0u8; 32],
-            _n: PhantomData,
         })
     }
 }

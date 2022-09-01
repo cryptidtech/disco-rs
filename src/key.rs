@@ -25,7 +25,7 @@ where
 {
     /// Generate a new key pair...the first returned tagged data is the public key, the other is
     /// the secret key
-    fn generate(&self, key_type: &impl KeyType, rng: impl RngCore + CryptoRng) -> (P, S);
+    fn generate(&mut self, key_type: &impl KeyType, rng: impl RngCore + CryptoRng) -> (P, S);
 }
 
 /// Trait for doing a key agreement
@@ -40,5 +40,10 @@ where
     type Error;
 
     /// Calculate the shared secret from a local key and a remote key
-    fn get_shared_secret(&self, local: &S, remote: &P) -> Result<SS, Self::Error>;
+    fn get_shared_secret(
+        &self,
+        key_type: &impl KeyType,
+        local: &S,
+        remote: &P,
+    ) -> Result<SS, Self::Error>;
 }

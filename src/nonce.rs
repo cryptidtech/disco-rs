@@ -3,29 +3,22 @@
     SPDX-License-Identifier: Apache-2.0
 */
 use crate::tag::{Tag, TaggedData};
-use rand_core::{CryptoRng, RngCore};
-
-/// This crate supports the out-of-order delivery of Disco messages to better support any and all
-/// transport mechanisms that may deliver messages out of order. One key security concern with
-/// out-of-order delivery is that the handshake cannot be done out of order. The strobe construct
-/// at the heart of Disco makes sure that the session is aborted if the handshake messages are
-/// processed out of order. The other key security concern is that the nonces associated with each
-/// message must be tracked to prevent a replay attack. Below are traits for implementing a nonce
-/// and a mechanism for tracking nonces. All Disco cares about is if its seen a nonce before or
-/// not, the actual implementation is left to the user.
 
 /// Trait for generating nonces and checking if we seen a nonce
-pub trait NonceGenerator<T, TD>: Clone + Default
+pub trait NonceGenerator<T, N>: Clone + Default
 where
     T: Tag,
-    TD: TaggedData<T>,
+    N: TaggedData<T>,
 {
     /// Generate a new nonce
-    fn generate(&mut self, rng: impl RngCore + CryptoRng) -> TD;
+    fn generate(&mut self) -> N;
 
-    /// Check and add the nonce if unseen
-    fn check_add(&mut self, nonce: &TD) -> bool;
+    /// Empty nonce
+    fn default_nonce(&self) -> N;
 
-    /// Reset the nonce generator
-    fn reset(&mut self);
+    /// Checks a nonce to see if it is valid
+    fn check(&mut self, nonce: &N) -> bool;
+
+    /// Resets the nonce generator and restarts it's stream from the channel state
+    fn reset(&mut self, channel_state: &[u8; 32]);
 }

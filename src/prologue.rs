@@ -7,4 +7,4 @@
 /// implementation to provide prologue data to the handshaking.
 
 /// the trait for a prologue data provider
-pub trait Prologue: AsRef<[u8]> + Clone + Default {}
+pub trait Prologue: AsRef<[u8]> + AsMut<[u8]> + Clone + Default {}

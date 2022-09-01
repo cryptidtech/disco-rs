@@ -42,6 +42,12 @@ pub enum ParamError {
     /// Invalid ephemeral key setup
     #[error("invalid ephemeral key setup")]
     InvalidEphemeralKeys,
+    /// Invalid duplex mode for this channel
+    #[error("invalid channel duplex mode")]
+    InvalidChannelDuplex,
+    /// Invalid transport order for this channel
+    #[error("invalid channel transport order")]
+    InvalidTransportOrder,
 }
 
 /// Errors that can happen during building
@@ -79,27 +85,41 @@ pub enum ProtocolError {
     /// Failed MAC of incoming message
     #[error("invalid mac error")]
     InvalidMac,
+    /// Invalid data
+    #[error("invalid data")]
+    InvalidData,
     /// Buffer isn't empty
     #[error("out buffer isn't empty")]
     NonEmptyBuffer,
     /// Invalid TaggedData length
     #[error("invalid length for tagged data")]
     InvalidBufferLen,
+
     /// Sending a pre-shared key is a protocol error
     #[error("sending pre-shared key error")]
     SendingPsk,
     /// Receiving a pre-shared key is a protocol error
     #[error("receiving pre-shared key error")]
     ReceivingPsk,
-    /// Invalid handshake operaion
-    #[error("invalid handshake operaion")]
-    InvalidHandshakeOp,
     /// Sending the prologue is a protocol error
     #[error("sending prologue error")]
     SendingPrologue,
     /// Receiving the prologue is a protocol error
     #[error("receiving prologue error")]
     ReceivingPrologue,
+    /// Sending a secret key is a protocol error
+    #[error("sending secret key error")]
+    SendingSecretKey,
+    /// Receiving a secret key is a protocol error
+    #[error("receiving secret key error")]
+    ReceivingSecretKey,
+
+    /// Invalid handshake operaion
+    #[error("invalid handshake operaion")]
+    InvalidHandshakeOp,
+    /// Invalid transport operation
+    #[error("invalid parameter for channel operation")]
+    InvalidTransportOp,
     /// Shared secret calculation error
     #[error("error calculating shared secret")]
     SharedSecretCalculationFailed,
@@ -109,18 +129,15 @@ pub enum ProtocolError {
     /// Invalid nonce encountered
     #[error("invalid nonce")]
     InvalidNonce,
-    /// Sending the PRF is a protocol error
-    #[error("sending prf error")]
-    SendingPrf,
-    /// Receiving the PRF is a protocol error
-    #[error("receiving prf error")]
-    ReceivingPrf,
-    /// An invalid op in the transport state
-    #[error("invalid transport op")]
-    InvalidTransportOp,
     /// The channel states aren't the same
     #[error("channel state mismatch")]
     ChannelStateMismatch,
+    /// Invalid send command
+    #[error("invalid send command")]
+    InvalidSend,
+    /// Invalid recv commmand
+    #[error("invalid recv command")]
+    InvalidRecv,
 }
 
 /// Errors related to tag parsing

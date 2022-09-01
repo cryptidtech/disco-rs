@@ -15,7 +15,8 @@ use disco_rs::{
     session::Session,
     tag::{Tag, TaggedData},
 };
-use rand_core::{CryptoRng, RngCore};
+use rand_chacha::ChaCha20Rng;
+use rand_core::{CryptoRng, RngCore, SeedableRng};
 use serde::{
     de::{self, MapAccess, SeqAccess, Unexpected, Visitor},
     ser::SerializeStruct,
@@ -28,8 +29,8 @@ pub type DiscoParams =
     Params<DiscoXeddsa, DiscoTag, DiscoPublicKey, DiscoSecretKey, DiscoSharedSecret>;
 pub type DiscoSession = Session<
     DiscoXeddsa,
-    DiscoNonceGenerator,
     DiscoPrologue,
+    DiscoNonceGenerator,
     DiscoTag,
     DiscoNonce,
     DiscoPublicKey,
@@ -38,8 +39,8 @@ pub type DiscoSession = Session<
 >;
 pub type DiscoBuilder = Builder<
     DiscoXeddsa,
-    DiscoNonceGenerator,
     DiscoPrologue,
+    DiscoNonceGenerator,
     DiscoTag,
     DiscoNonce,
     DiscoPublicKey,
@@ -228,9 +229,9 @@ where
         &self.tag
     }
 
-    /// Set the tag
-    fn set_tag(&mut self, tag: &DiscoTag) {
-        self.tag = *tag;
+    /// Get a mutable reference to the tag
+    fn get_tag_mut(&mut self) -> &mut DiscoTag {
+        &mut self.tag
     }
 }
 
@@ -324,7 +325,9 @@ impl Into<[u8; 32]> for DiscoSharedSecret {
 
 /// KeyType + KeyGenerator + KeyAgreement for xeddsa (x2519) keys
 #[derive(Clone, Debug, Default, PartialEq, Zeroize, Serialize, Deserialize)]
-pub struct DiscoXeddsa {}
+pub struct DiscoXeddsa {
+    i: usize,
+}
 
 /// This type does impl Display and FromStr so we just need to say it does
 impl KeyType for DiscoXeddsa {}
@@ -333,13 +336,30 @@ impl KeyType for DiscoXeddsa {}
 impl KeyGenerator<DiscoTag, DiscoPublicKey, DiscoSecretKey> for DiscoXeddsa {
     /// Generate a new key from a random data source
     fn generate(
-        &self,
+        &mut self,
         _key_type: &impl KeyType,
-        rng: impl RngCore + CryptoRng,
+        _rng: impl RngCore + CryptoRng,
     ) -> (DiscoPublicKey, DiscoSecretKey) {
+        let mock_secret_key: [[u8; 32]; 2] = [
+            [
+                0x25, 0x85, 0x57, 0xfa, 0xf9, 0x3f, 0xa3, 0x0d, 0xe0, 0x60, 0xc2, 0x23, 0x86, 0x1d,
+                0x0d, 0xe9, 0x6b, 0xaf, 0x75, 0x04, 0x9d, 0x68, 0x3b, 0x2e, 0x7f, 0xd1, 0xd1, 0xb4,
+                0x52, 0xfd, 0x3f, 0x55,
+            ],
+            [
+                0x8e, 0x0b, 0x2d, 0x09, 0x75, 0x1f, 0x75, 0xfc, 0x8e, 0xee, 0xd7, 0xf5, 0x91, 0xcb,
+                0xdf, 0x0b, 0xc7, 0x69, 0x8b, 0xb2, 0x78, 0xde, 0x76, 0x7e, 0x0e, 0x2e, 0x63, 0xdb,
+                0x39, 0x6e, 0x73, 0xcc,
+            ],
+        ];
+        let s = x25519_dalek::StaticSecret::from(mock_secret_key[self.i]);
+        let p = x25519_dalek::PublicKey::from(&s);
+        self.i = (self.i + 1) % 2;
+        /*
         let mut r = RngWrapper(rng);
         let s = x25519_dalek::StaticSecret::new(&mut r);
         let p = x25519_dalek::PublicKey::from(&s);
+        */
         (
             DiscoPublicKey::from(p.as_bytes()),
             DiscoSecretKey::from(&s.to_bytes()),
@@ -354,6 +374,7 @@ impl KeyAgreement<DiscoTag, DiscoPublicKey, DiscoSecretKey, DiscoSharedSecret> f
     /// Do the ECDH operation
     fn get_shared_secret(
         &self,
+        _key_type: &impl KeyType,
         local: &DiscoSecretKey,
         remote: &DiscoPublicKey,
     ) -> Result<DiscoSharedSecret, Self::Error> {
@@ -376,7 +397,7 @@ impl FromStr for DiscoXeddsa {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
-            "25519" => Ok(DiscoXeddsa {}),
+            "25519" => Ok(DiscoXeddsa::default()),
             _ => Err(ParamError::InvalidKeyType.into()),
         }
     }
@@ -390,10 +411,10 @@ impl Display for DiscoXeddsa {
 }
 
 /// Disco nonce value
-#[derive(Clone, Default, Serialize, Deserialize)]
+#[derive(Clone, Serialize, Deserialize)]
 pub struct DiscoNonce {
     tag: DiscoTag,
-    buf: [u8; 8], // u64 as 8 little-endian bytes
+    buf: [u8; 8], // u64 as 8 big-endian bytes
 }
 
 impl TaggedData<DiscoTag> for DiscoNonce {
@@ -402,9 +423,20 @@ impl TaggedData<DiscoTag> for DiscoNonce {
         &self.tag
     }
 
-    /// Set the tag
-    fn set_tag(&mut self, tag: &DiscoTag) {
-        self.tag = *tag;
+    /// Get a mutable tag reference
+    fn get_tag_mut(&mut self) -> &mut DiscoTag {
+        &mut self.tag
+    }
+}
+
+impl Default for DiscoNonce {
+    fn default() -> Self {
+        let mut t = DiscoTag::from("nonce.u128.be");
+        t.set_data_length(8);
+        Self {
+            tag: t,
+            buf: [0u8; 8],
+        }
     }
 }
 
@@ -424,7 +456,7 @@ impl AsMut<[u8]> for DiscoNonce {
 
 impl From<&[u8; 8]> for DiscoNonce {
     fn from(b: &[u8; 8]) -> Self {
-        let mut t = DiscoTag::from("nonce.u64.le");
+        let mut t = DiscoTag::from("nonce.u128.be");
         t.set_data_length(8);
         Self { tag: t, buf: *b }
     }
@@ -455,6 +487,12 @@ impl AsRef<[u8]> for DiscoPrologue {
     }
 }
 
+impl AsMut<[u8]> for DiscoPrologue {
+    fn as_mut(&mut self) -> &mut [u8] {
+        &mut self.data[..self.len]
+    }
+}
+
 impl FromStr for DiscoPrologue {
     type Err = Error;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -465,68 +503,89 @@ impl FromStr for DiscoPrologue {
     }
 }
 
-/// The nonce generator and checker for DiscoXeddsa. This implements a simple sliding window for
-/// checking nonce values we've seen. It also serves as a monotonic counter for generating nonces.
-/// Because Disco has two separate channels, one for inbound and one for outbound messages, the
-/// inbound nonce generator is used exclusively for tracking nonces seen. The outbound nonce
-/// generator is simply a monotonic counter. The rules for tracking inbound nonces are like this:
-///
-/// 1. All nonces are unsigned  64-bit integers.
-/// 2. A valid nonce is within the window of current +/- threshold.
-/// 3. If a nonce is valid and greater than the current value, the current value is assigned this
-///    new nonce and the window of validity shifts upwards.
-///
-/// Typically the threshold value shouldn't be very large; 1024 seems reasonable although tuning in
-/// your specific application is probably warranted. Handshakes do not use nonces because they have
-/// to happen in a specific order to be valid. Once the handshake with a key agreement operation
-/// has completed, nonces are part of the encrypted payload of the message so nonce-based denial of
-/// service attacks are entirely prevented unless one endpoint is malicious.
-#[derive(Clone, Default, Serialize, Deserialize)]
+// the window size for the valid nonces
+const MAX_NONCE_COUNT: usize = 64;
+
+/// Handles generating pseudo-random stream of nonces from the handshake hash and the channel state
+/// after each re-key
+#[derive(Clone, Serialize, Deserialize)]
 pub struct DiscoNonceGenerator {
-    current: u64,
-    threshold: u64,
+    i: usize,
+    #[serde(with = "BigArray")]
+    nonces: [u64; MAX_NONCE_COUNT],
+    rng: ChaCha20Rng,
 }
 
 impl DiscoNonceGenerator {
-    pub fn new(threshold: u64) -> Self {
+    pub fn new() -> Self {
         Self {
-            current: 0,
-            threshold,
+            i: 0,
+            nonces: [0u64; MAX_NONCE_COUNT],
+            rng: ChaCha20Rng::seed_from_u64(0),
+        }
+    }
+
+    fn replace_id(&mut self, i: usize) {
+        let mut b = [0u8; 8];
+        self.rng.fill_bytes(&mut b);
+        self.nonces[i] = u64::from_be_bytes(b);
+    }
+}
+
+impl Default for DiscoNonceGenerator {
+    fn default() -> Self {
+        Self {
+            i: 0,
+            nonces: [0u64; MAX_NONCE_COUNT],
+            rng: ChaCha20Rng::seed_from_u64(0),
         }
     }
 }
 
 impl NonceGenerator<DiscoTag, DiscoNonce> for DiscoNonceGenerator {
     /// generate a new nonce
-    fn generate(&mut self, _rng: impl RngCore + CryptoRng) -> DiscoNonce {
-        let nonce = self.current;
-        self.current += 1;
+    fn generate(&mut self) -> DiscoNonce {
+        // get the next id
+        let nonce = self.nonces[self.i];
 
-        DiscoNonce::from(&nonce.to_le_bytes())
+        // replace it
+        self.replace_id(self.i);
+
+        // move the index to the next id
+        self.i = (self.i + 1) % MAX_NONCE_COUNT;
+
+        // return the id
+        DiscoNonce::from(&nonce.to_be_bytes())
+    }
+
+    /// return an empty nonce for receiving nonces
+    fn default_nonce(&self) -> DiscoNonce {
+        DiscoNonce::default()
     }
 
     /// check the validity of a nonce and add it to the list of seen nonces
-    fn check_add(&mut self, nonce: &DiscoNonce) -> bool {
+    fn check(&mut self, nonce: &DiscoNonce) -> bool {
         let mut buf = [0u8; 8];
         buf.copy_from_slice(nonce.as_ref());
-        let nonce = u64::from_le_bytes(buf);
+        let nonce = u64::from_be_bytes(buf);
 
-        let valid = if self.current > self.threshold {
-            nonce >= (self.current - self.threshold) && nonce <= (self.current + self.threshold)
-        } else {
-            nonce <= (self.current + self.threshold)
-        };
-
-        if valid && nonce > self.current {
-            self.current = nonce;
+        for i in 0..MAX_NONCE_COUNT {
+            if self.nonces[i] == nonce {
+                self.replace_id(i);
+                return true;
+            }
         }
 
-        valid
+        false
     }
 
     /// reset the nonce generator
-    fn reset(&mut self) {
-        self.current = 0;
+    fn reset(&mut self, channel_state: &[u8; 32]) {
+        self.i = 0;
+        self.rng = ChaCha20Rng::from_seed(*channel_state);
+        for i in 0..MAX_NONCE_COUNT {
+            self.replace_id(i);
+        }
     }
 }
 
